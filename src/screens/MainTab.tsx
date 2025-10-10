@@ -8,6 +8,7 @@ import {
   Dimensions,
   ScrollView,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { sessionStorage, dailyEntriesStorage, streakStorage, profileStorage, settingsStorage } from '../lib/storage';
 import { 
@@ -19,14 +20,18 @@ import {
   calculateCigarettesAvoided,
   calculateMoneySaved,
   getSeedProgress,
-  checkAndResetStreak
+  checkAndResetStreak,
+  getHealthBenefits,
+  updateUnlockedHealthBenefits
 } from '../utils/calculations';
 import { TimerSession, DailyEntry, StreakData, UserProfile, AppSettings } from '../types';
 import DailyEntryModal from '../components/DailyEntryModal';
+import OnboardingModal, { OnboardingData } from '../components/OnboardingModal';
 
 const { width } = Dimensions.get('window');
 
 export default function MainTab() {
+  const navigation = useNavigation();
   const [session, setSession] = useState<TimerSession>({
     isRunning: false,
     startTimestamp: null,
@@ -50,11 +55,19 @@ export default function MainTab() {
   });
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
+  const [onboardingVisible, setOnboardingVisible] = useState(false);
 
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // Vérifier si l'onboarding est nécessaire
+  useEffect(() => {
+    if (!profile.onboardingCompleted) {
+      setOnboardingVisible(true);
+    }
+  }, [profile]);
 
   // Vérifier le reset du streak au chargement
   useEffect(() => {
@@ -160,12 +173,22 @@ export default function MainTab() {
     );
   };
 
-  const handleDailyEntry = (day: number) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (6 - day));
-    const dateString = date.toISOString().split('T')[0];
+  const handleDailyEntry = (dayIndex: number) => {
+    const days = getSevenDaysData();
+    const selectedDay = days[dayIndex];
     
-    setSelectedDate(dateString);
+    // Vérifier si c'est un jour futur
+    const today = new Date().toISOString().split('T')[0];
+    if (selectedDay.date > today) {
+      Alert.alert(
+        'Jour futur',
+        'Vous ne pouvez pas saisir d\'entrée pour un jour futur. Connectez-vous chaque jour pour suivre votre progression ! 🌱',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    setSelectedDate(selectedDay.date);
     setModalVisible(true);
   };
 
@@ -215,27 +238,78 @@ export default function MainTab() {
     }
   };
 
+  const handleOnboardingComplete = async (onboardingData: OnboardingData) => {
+    try {
+      // Mettre à jour le profil avec les données d'onboarding
+      const updatedProfile: UserProfile = {
+        ...profile,
+        smokingYears: onboardingData.smokingYears,
+        smokingPeakTime: onboardingData.smokingPeakTime,
+        mainGoal: onboardingData.mainGoal,
+        mainMotivation: onboardingData.mainMotivation,
+        previousAttempts: onboardingData.previousAttempts,
+        smokingTriggers: onboardingData.smokingTriggers,
+        smokingSituations: onboardingData.smokingSituations,
+        onboardingCompleted: true,
+        // Mettre à jour les valeurs existantes avec les nouvelles données
+        cigsPerDay: onboardingData.cigsPerDay,
+        startedSmokingYears: onboardingData.smokingYears,
+        // Définir l'objectif basé sur la réponse
+        objectiveType: onboardingData.mainGoal === 'complete_stop' ? 'complete' : 'progressive',
+        // Ajouter les nouvelles données d'objectif
+        targetDate: onboardingData.targetDate,
+      };
+      
+      setProfile(updatedProfile);
+      await profileStorage.set(updatedProfile);
+      setOnboardingVisible(false);
+      
+      Alert.alert(
+        'Profil créé !',
+        'Votre profil personnalisé a été créé avec succès. Vous êtes maintenant prêt à commencer votre parcours ! 🌱',
+        [{ text: 'Commencer', style: 'default' }]
+      );
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde du profil:', error);
+      Alert.alert('Erreur', 'Impossible de sauvegarder votre profil');
+    }
+  };
+
   const getSevenDaysData = () => {
     const days = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
+    
+    // Trouver le premier jour (jour 1) - la première entrée dans dailyEntries
+    const sortedDates = Object.keys(dailyEntries).sort();
+    let firstDay: Date;
+    
+    if (sortedDates.length === 0) {
+      // Si aucune entrée, considérer aujourd'hui comme le jour 1
+      firstDay = new Date();
+    } else {
+      firstDay = new Date(sortedDates[0]);
+    }
+    
+    // Toujours afficher 7 jours, en commençant par le jour 1
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(firstDay);
+      date.setDate(firstDay.getDate() + i);
       const dateString = date.toISOString().split('T')[0];
       const entry = dailyEntries[dateString];
       
-      // Calculer l'objectif pour ce jour
-      const dayIndex = Object.keys(dailyEntries).length + i;
+      // Calculer l'objectif pour ce jour (jour 1, 2, 3, etc.)
+      const dayNumberFromStart = i + 1;
       const goalCigs = profile.objectiveType === 'complete' 
         ? 0 
-        : getProgressiveGoal(profile, dayIndex);
+        : getProgressiveGoal(profile, dayNumberFromStart - 1);
       
       days.push({
         date: dateString,
         dayName: date.toLocaleDateString('fr-FR', { weekday: 'short' }),
         dayNumber: date.getDate(),
         entry,
-        isToday: i === 0,
+        isToday: dateString === new Date().toISOString().split('T')[0],
         goalCigs,
+        dayNumberFromStart,
       });
     }
     return days;
@@ -319,37 +393,65 @@ export default function MainTab() {
           <View style={styles.sevenDaysContainer}>
             <View style={styles.daysLabels}>
               {getSevenDaysData().map((day, index) => (
-                <Text key={index} style={styles.dayLabel}>{day.dayName}</Text>
+                <View key={index} style={styles.dayLabelContainer}>
+                  <Text style={styles.dayLabel}>{day.dayName}</Text>
+                  <Text style={styles.dayDate}>{day.dayNumber}/{new Date(day.date).getMonth() + 1}</Text>
+                </View>
               ))}
             </View>
             <View style={styles.daysIndicators}>
               {getSevenDaysData().map((day, index) => {
                 const hasEntry = day.entry !== undefined;
                 const objectiveMet = day.entry?.objectiveMet || false;
+                const realCigs = day.entry?.realCigs || 0;
+                const goalCigs = day.goalCigs;
+                const progress = goalCigs > 0 ? Math.min(realCigs / goalCigs, 1) : 0;
+                const isOverGoal = realCigs > goalCigs;
                 
                 return (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.dayIndicator,
-                      hasEntry && {
-                        backgroundColor: objectiveMet ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)',
-                        borderColor: objectiveMet ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)',
-                      }
-                    ]}
-                    onPress={() => handleDailyEntry(index)}
-                  >
-                    {hasEntry ? (
-                      <Text style={[
-                        styles.dayIndicatorIcon,
-                        { color: objectiveMet ? '#10B981' : '#EF4444' }
-                      ]}>
-                        {objectiveMet ? '✓' : '✗'}
-                      </Text>
-                    ) : (
-                      <View style={styles.dayIndicatorInner} />
+                  <View key={index} style={styles.dayContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.dayIndicator,
+                        hasEntry && {
+                          backgroundColor: objectiveMet ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+                          borderColor: objectiveMet ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)',
+                        }
+                      ]}
+                      onPress={() => handleDailyEntry(index)}
+                    >
+                      {hasEntry ? (
+                        <Text style={[
+                          styles.dayIndicatorIcon,
+                          { color: objectiveMet ? '#10B981' : '#EF4444' }
+                        ]}>
+                          {objectiveMet ? '✓' : '✗'}
+                        </Text>
+                      ) : (
+                        <View style={styles.dayIndicatorInner} />
+                      )}
+                    </TouchableOpacity>
+                    
+                    {/* Barre de progression sous chaque jour */}
+                    {hasEntry && (
+                      <View style={styles.dayProgressContainer}>
+                        <View style={styles.dayProgressBar}>
+                          <View 
+                            style={[
+                              styles.dayProgressFill, 
+                              { 
+                                width: `${Math.min(progress * 100, 100)}%`,
+                                backgroundColor: isOverGoal ? '#EF4444' : '#10B981'
+                              }
+                            ]} 
+                          />
+                        </View>
+                        <Text style={styles.dayProgressText}>
+                          {realCigs}/{goalCigs}
+                        </Text>
+                      </View>
                     )}
-                  </TouchableOpacity>
+                  </View>
                 );
               })}
             </View>
@@ -379,8 +481,12 @@ export default function MainTab() {
               style={[styles.actionButton, styles.commitButton]}
               onPress={handleStart}
             >
-              <Text style={styles.actionButtonIcon}>✓</Text>
-              <Text style={styles.actionButtonText}>Engagé</Text>
+              <Text style={styles.actionButtonIcon}>
+                {session.startTimestamp ? '✓' : '🚀'}
+              </Text>
+              <Text style={styles.actionButtonText}>
+                {session.startTimestamp ? 'Engagé' : 'Démarrer'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={[styles.actionButton, styles.meditateButton]}>
@@ -473,14 +579,65 @@ export default function MainTab() {
             </Text>
           </View>
 
-          {/* Achievement santé */}
-          <View style={styles.achievementContainer}>
-            <Text style={styles.sectionTitle}>🏆 Dernier bénéfice santé</Text>
-            <View style={styles.achievementCard}>
-              <Text style={styles.achievementText}>
-                +24h : Respiration améliorée
-              </Text>
-            </View>
+          {/* Dernier objectif santé accompli */}
+          <View style={styles.healthGoalsContainer}>
+            <Text style={styles.sectionTitle}>🏥 Dernier bénéfice santé</Text>
+            
+            {(() => {
+              const healthBenefits = getHealthBenefits();
+              const updatedBenefits = updateUnlockedHealthBenefits(healthBenefits, elapsed);
+              
+              // Trouver le dernier objectif accompli
+              const accomplishedGoals = updatedBenefits.filter(benefit => benefit.unlocked);
+              
+              if (accomplishedGoals.length === 0) {
+                return (
+                  <TouchableOpacity 
+                    style={styles.healthGoalCard}
+                    onPress={() => {
+                      // Navigation vers l'onglet Analytics avec paramètre pour aller à Santé
+                      // @ts-ignore
+                      navigation.navigate('Analytics', { initialRoute: 'Santé' });
+                    }}
+                  >
+                    <Text style={styles.healthGoalText}>
+                      🚀 Commencez votre parcours santé !
+                    </Text>
+                    <Text style={styles.healthGoalSubtext}>
+                      Cliquez pour voir tous les objectifs
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }
+              
+              // Prendre le dernier objectif accompli (le plus récent)
+              const lastAccomplished = accomplishedGoals[accomplishedGoals.length - 1];
+              
+              return (
+                <TouchableOpacity 
+                  style={[styles.healthGoalCard, styles.healthGoalCardAccomplished]}
+                  onPress={() => {
+                    // Navigation vers l'onglet Analytics avec paramètre pour aller à Santé
+                    // @ts-ignore
+                    navigation.navigate('Analytics', { initialRoute: 'Santé' });
+                  }}
+                >
+                  <View style={styles.healthGoalHeader}>
+                    <Text style={styles.healthGoalTitleAccomplished}>{lastAccomplished.title}</Text>
+                    <Text style={styles.healthGoalIcon}>✅</Text>
+                  </View>
+                  <Text style={styles.healthGoalDescriptionAccomplished}>
+                    {lastAccomplished.description}
+                  </Text>
+                  <View style={styles.healthProgressBarAccomplished}>
+                    <View style={styles.healthProgressFillAccomplished} />
+                  </View>
+                  <Text style={styles.healthGoalStatus}>
+                    🎉 Objectif atteint ! Cliquez pour voir tous les bénéfices
+                  </Text>
+                </TouchableOpacity>
+              );
+            })()}
           </View>
           </View>
         </ScrollView>
@@ -494,6 +651,12 @@ export default function MainTab() {
         date={selectedDate}
         goalCigs={profile.objectiveType === 'complete' ? 0 : getProgressiveGoal(profile, Object.keys(dailyEntries).length)}
         initialEntry={selectedDate ? dailyEntries[selectedDate] : undefined}
+      />
+
+      {/* Modal d'onboarding */}
+      <OnboardingModal
+        visible={onboardingVisible}
+        onComplete={handleOnboardingComplete}
       />
     </View>
   );
@@ -543,17 +706,31 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     paddingHorizontal: 10,
   },
+  dayLabelContainer: {
+    alignItems: 'center',
+  },
   dayLabel: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '500',
     opacity: 0.8,
   },
+  dayDate: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '400',
+    opacity: 0.6,
+    marginTop: 2,
+  },
   daysIndicators: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 5,
+  },
+  dayContainer: {
+    alignItems: 'center',
+    flex: 1,
   },
   dayIndicator: {
     width: 40,
@@ -564,6 +741,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(139, 69, 255, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 8,
   },
   dayIndicatorInner: {
     width: 20,
@@ -574,6 +752,27 @@ const styles = StyleSheet.create({
   dayIndicatorIcon: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  dayProgressContainer: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  dayProgressBar: {
+    width: 30,
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  dayProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  dayProgressText: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '500',
   },
   closeButton: {
     width: 40,
@@ -781,20 +980,109 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
   },
-  achievementContainer: {
+  healthGoalsContainer: {
     marginBottom: 30,
   },
-  achievementCard: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+  healthGoalCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 15,
+    marginBottom: 12,
     borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  healthGoalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  healthGoalTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  healthGoalPercentage: {
+    color: '#3B82F6',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  healthGoalDescription: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginBottom: 10,
+    lineHeight: 16,
+  },
+  healthProgressBar: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  healthProgressFill: {
+    height: '100%',
+    backgroundColor: '#3B82F6',
+    borderRadius: 3,
+  },
+  healthGoalTimeRemaining: {
+    color: '#64748B',
+    fontSize: 11,
+    fontStyle: 'italic',
+    textAlign: 'right',
+  },
+  healthGoalText: {
+    color: '#10B981',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  healthGoalSubtext: {
+    color: '#94A3B8',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 5,
+    fontStyle: 'italic',
+  },
+  healthGoalCardAccomplished: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
     borderColor: 'rgba(16, 185, 129, 0.3)',
   },
-  achievementText: {
-    color: '#F8FAFC',
-    fontSize: 16,
+  healthGoalTitleAccomplished: {
+    color: '#10B981',
+    fontSize: 14,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  healthGoalIcon: {
+    fontSize: 18,
+  },
+  healthGoalDescriptionAccomplished: {
+    color: '#E2E8F0',
+    fontSize: 12,
+    marginBottom: 10,
+    lineHeight: 16,
+  },
+  healthProgressBarAccomplished: {
+    height: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  healthProgressFillAccomplished: {
+    height: '100%',
+    backgroundColor: '#10B981',
+    borderRadius: 3,
+    width: '100%',
+  },
+  healthGoalStatus: {
+    color: '#10B981',
+    fontSize: 11,
+    fontStyle: 'italic',
     textAlign: 'center',
+    fontWeight: '600',
   },
   seedContainer: {
     alignItems: 'center',

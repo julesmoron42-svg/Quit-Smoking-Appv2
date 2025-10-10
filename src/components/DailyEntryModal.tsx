@@ -113,7 +113,7 @@ export default function DailyEntryModal({
 
   const motivationalMsg = getMotivationalMessage();
   const realCigsNum = parseInt(realCigs, 10);
-  const progress = isNaN(realCigsNum) ? 0 : Math.min(realCigsNum / goalCigs, 1);
+  const progress = isNaN(realCigsNum) ? 0 : realCigsNum / goalCigs;
 
   return (
     <Modal

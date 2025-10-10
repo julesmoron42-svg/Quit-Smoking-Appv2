@@ -8,10 +8,13 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { profileStorage, settingsStorage } from '../lib/storage';
 import { UserProfile, AppSettings } from '../types';
+
+const { width } = Dimensions.get('window');
 
 export default function ProfileTab() {
   const [profile, setProfile] = useState<UserProfile>({
@@ -78,22 +81,39 @@ export default function ProfileTab() {
 
   const savings = calculateSavings();
 
+  const getMotivationText = () => {
+    switch (profile.mainMotivation) {
+      case 'health': return 'Pour améliorer ma santé';
+      case 'finance': return 'Pour économiser de l\'argent';
+      case 'family': return 'Pour ma famille et mes proches';
+      case 'sport': return 'Pour améliorer mes performances sportives';
+      case 'independence': return 'Pour retrouver ma liberté';
+      default: return 'Non spécifié';
+    }
+  };
+
+  const getSmokingTimeText = () => {
+    switch (profile.smokingPeakTime) {
+      case 'morning': return 'Le matin au réveil';
+      case 'after_meals': return 'Après les repas';
+      case 'evening': return 'En soirée';
+      case 'all_day': return 'Tout au long de la journée';
+      case 'work_breaks': return 'Pendant les pauses au travail';
+      default: return 'Non spécifié';
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Fond étoilé */}
       <View style={styles.starryBackground}>
-        {Array.from({ length: 150 }).map((_, i) => {
+        {Array.from({ length: 100 }).map((_, i) => {
           const positions = [
             { left: 10, top: 15 }, { left: 25, top: 8 }, { left: 40, top: 20 }, { left: 60, top: 12 }, { left: 80, top: 18 },
             { left: 90, top: 25 }, { left: 15, top: 35 }, { left: 35, top: 40 }, { left: 55, top: 32 }, { left: 75, top: 38 },
             { left: 85, top: 45 }, { left: 20, top: 55 }, { left: 45, top: 60 }, { left: 65, top: 52 }, { left: 85, top: 58 },
             { left: 12, top: 70 }, { left: 30, top: 75 }, { left: 50, top: 68 }, { left: 70, top: 72 }, { left: 88, top: 78 },
-            { left: 18, top: 85 }, { left: 38, top: 88 }, { left: 58, top: 82 }, { left: 78, top: 85 }, { left: 92, top: 90 },
-            { left: 5, top: 25 }, { left: 95, top: 30 }, { left: 8, top: 45 }, { left: 92, top: 50 }, { left: 3, top: 65 },
-            { left: 97, top: 70 }, { left: 6, top: 80 }, { left: 94, top: 85 }, { left: 22, top: 5 }, { left: 42, top: 3 },
-            { left: 62, top: 7 }, { left: 82, top: 4 }, { left: 98, top: 8 }, { left: 2, top: 40 }, { left: 98, top: 45 },
-            { left: 1, top: 60 }, { left: 99, top: 65 }, { left: 4, top: 80 }, { left: 96, top: 82 }, { left: 14, top: 95 },
-            { left: 34, top: 92 }, { left: 54, top: 96 }, { left: 74, top: 93 }, { left: 86, top: 98 }
+            { left: 18, top: 85 }, { left: 38, top: 88 }, { left: 58, top: 82 }, { left: 78, top: 85 }, { left: 92, top: 90 }
           ];
           
           const pos = positions[i % positions.length];
@@ -121,191 +141,248 @@ export default function ProfileTab() {
         style={styles.gradientContainer}
       >
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Section Profil */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>👤 Mon Profil</Text>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Depuis combien de temps fumez-vous ?</Text>
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.numberInput}
-                value={profile.startedSmokingYears.toString()}
-                onChangeText={(text) => setProfile({
-                  ...profile,
-                  startedSmokingYears: parseInt(text) || 0,
-                })}
-                keyboardType="numeric"
-                placeholder="0"
-              />
-              <Text style={styles.inputSuffix}>années</Text>
+          <View style={styles.content}>
+            
+            {/* Header avec avatar */}
+            <View style={styles.headerSection}>
+              <View style={styles.avatarContainer}>
+                <Text style={styles.avatarEmoji}>🌱</Text>
+              </View>
+              <Text style={styles.headerTitle}>Mon Parcours</Text>
+              <Text style={styles.headerSubtitle}>Personnalisez votre expérience</Text>
             </View>
-          </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Cigarettes par jour</Text>
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.numberInput}
-                value={profile.cigsPerDay.toString()}
-                onChangeText={(text) => setProfile({
-                  ...profile,
-                  cigsPerDay: parseInt(text) || 0,
-                })}
-                keyboardType="numeric"
-                placeholder="20"
-              />
-              <Text style={styles.inputSuffix}>cigarettes</Text>
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Objectif</Text>
-            <View style={styles.radioGroup}>
-              <TouchableOpacity
-                style={[
-                  styles.radioOption,
-                  profile.objectiveType === 'complete' && styles.radioSelected,
-                ]}
-                onPress={() => setProfile({ ...profile, objectiveType: 'complete' })}
-              >
-                <Text style={[
-                  styles.radioText,
-                  profile.objectiveType === 'complete' && styles.radioTextSelected,
-                ]}>
-                  Arrêt définitif
-                </Text>
-              </TouchableOpacity>
+            {/* Profil Fumeur */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIcon}>🚬</Text>
+                <Text style={styles.cardTitle}>Mon Profil Fumeur</Text>
+              </View>
               
-              <TouchableOpacity
-                style={[
-                  styles.radioOption,
-                  profile.objectiveType === 'progressive' && styles.radioSelected,
-                ]}
-                onPress={() => setProfile({ ...profile, objectiveType: 'progressive' })}
-              >
-                <Text style={[
-                  styles.radioText,
-                  profile.objectiveType === 'progressive' && styles.radioTextSelected,
-                ]}>
-                  Arrêt progressif
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Depuis combien d'années fumez-vous ?</Text>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    value={profile.smokingYears?.toString() || profile.startedSmokingYears.toString()}
+                    onChangeText={(text) => setProfile({
+                      ...profile,
+                      smokingYears: parseInt(text) || 0,
+                      startedSmokingYears: parseInt(text) || 0,
+                    })}
+                    keyboardType="numeric"
+                    placeholder="Ex: 5"
+                    placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                  />
+                  <Text style={styles.inputSuffix}>années</Text>
+                </View>
+              </View>
 
-          {profile.objectiveType === 'progressive' && (
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Réduire de 1 cigarette tous les</Text>
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={styles.numberInput}
-                  value={profile.reductionFrequency?.toString() || '1'}
-                  onChangeText={(text) => setProfile({
-                    ...profile,
-                    reductionFrequency: parseInt(text) || 1,
-                  })}
-                  keyboardType="numeric"
-                  placeholder="1"
-                />
-                <Text style={styles.inputSuffix}>jours</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Combien de cigarettes par jour ?</Text>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    value={profile.cigsPerDay.toString()}
+                    onChangeText={(text) => setProfile({
+                      ...profile,
+                      cigsPerDay: parseInt(text) || 0,
+                    })}
+                    keyboardType="numeric"
+                    placeholder="Ex: 20"
+                    placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                  />
+                  <Text style={styles.inputSuffix}>cigarettes</Text>
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Quand fumez-vous le plus ?</Text>
+                <View style={styles.infoContainer}>
+                  <Text style={styles.infoText}>{getSmokingTimeText()}</Text>
+                </View>
               </View>
             </View>
-          )}
 
-          <TouchableOpacity style={styles.saveButton} onPress={saveProfile}>
-            <Text style={styles.saveButtonText}>💾 Sauvegarder le profil</Text>
-          </TouchableOpacity>
-        </View>
+            {/* Objectifs */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIcon}>🎯</Text>
+                <Text style={styles.cardTitle}>Mon Objectif</Text>
+              </View>
+              
+              <View style={styles.objectiveButtons}>
+                <TouchableOpacity
+                  style={[
+                    styles.objectiveButton,
+                    (profile.objectiveType === 'complete' || profile.mainGoal === 'complete_stop') && styles.objectiveButtonSelected,
+                  ]}
+                  onPress={() => setProfile({ 
+                    ...profile, 
+                    objectiveType: 'complete', 
+                    mainGoal: 'complete_stop' 
+                  })}
+                >
+                  <Text style={[
+                    styles.objectiveButtonText,
+                    (profile.objectiveType === 'complete' || profile.mainGoal === 'complete_stop') && styles.objectiveButtonTextSelected,
+                  ]}>
+                    Arrêt Complet
+                  </Text>
+                  <Text style={[
+                    styles.objectiveButtonSubtext,
+                    (profile.objectiveType === 'complete' || profile.mainGoal === 'complete_stop') && styles.objectiveButtonSubtextSelected,
+                  ]}>
+                    J'arrête définitivement
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.objectiveButton,
+                    (profile.objectiveType === 'progressive' || profile.mainGoal === 'progressive_reduction') && styles.objectiveButtonSelected,
+                  ]}
+                  onPress={() => setProfile({ 
+                    ...profile, 
+                    objectiveType: 'progressive', 
+                    mainGoal: 'progressive_reduction' 
+                  })}
+                >
+                  <Text style={[
+                    styles.objectiveButtonText,
+                    (profile.objectiveType === 'progressive' || profile.mainGoal === 'progressive_reduction') && styles.objectiveButtonTextSelected,
+                  ]}>
+                    Arrêt Progressif
+                  </Text>
+                  <Text style={[
+                    styles.objectiveButtonSubtext,
+                    (profile.objectiveType === 'progressive' || profile.mainGoal === 'progressive_reduction') && styles.objectiveButtonSubtextSelected,
+                  ]}>
+                    Je réduis progressivement
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-        {/* Section Notifications */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔔 Notifications</Text>
-          
-          <View style={styles.switchGroup}>
-            <Text style={styles.switchLabel}>
-              Rappels quotidiens pour entrer votre consommation
-            </Text>
-            <Switch
-              value={settings.notificationsAllowed}
-              onValueChange={(value) => setSettings({
-                ...settings,
-                notificationsAllowed: value,
-              })}
-              trackColor={{ false: '#64748B', true: '#3B82F6' }}
-              thumbColor={settings.notificationsAllowed ? '#F8FAFC' : '#F8FAFC'}
-            />
-          </View>
-          
-          <Text style={styles.switchDescription}>
-            Recevez des rappels quotidiens pour saisir votre consommation de cigarettes
-          </Text>
-        </View>
+              {/* Date d'arrêt pour arrêt complet */}
+              {(profile.objectiveType === 'complete' || profile.mainGoal === 'complete_stop') && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Quand souhaitez-vous arrêter complètement ?</Text>
+                  <TextInput
+                    style={styles.dateInput}
+                    value={profile.targetDate || ''}
+                    onChangeText={(text) => setProfile({ ...profile, targetDate: text })}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                  />
+                </View>
+              )}
 
-        {/* Section Économies */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>💰 Économies potentielles</Text>
-          
-          <View style={styles.savingsContainer}>
-            <View style={styles.savingsCard}>
-              <Text style={styles.savingsAmount}>{savings.daily}€</Text>
-              <Text style={styles.savingsLabel}>Par jour</Text>
+              {/* Fréquence pour arrêt progressif */}
+              {(profile.objectiveType === 'progressive' || profile.mainGoal === 'progressive_reduction') && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Combien de cigarettes voulez-vous réduire chaque semaine ?</Text>
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={styles.input}
+                      value={profile.reductionFrequency?.toString() || '1'}
+                      onChangeText={(text) => setProfile({
+                        ...profile,
+                        reductionFrequency: parseInt(text) || 1,
+                      })}
+                      keyboardType="numeric"
+                      placeholder="1"
+                      placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                    />
+                    <Text style={styles.inputSuffix}>cigarettes/semaine</Text>
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Ma motivation principale</Text>
+                <View style={styles.infoContainer}>
+                  <Text style={styles.infoText}>{getMotivationText()}</Text>
+                </View>
+              </View>
             </View>
-            
-            <View style={styles.savingsCard}>
-              <Text style={styles.savingsAmount}>{savings.monthly}€</Text>
-              <Text style={styles.savingsLabel}>Par mois</Text>
-            </View>
-            
-            <View style={styles.savingsCard}>
-              <Text style={styles.savingsAmount}>{savings.yearly}€</Text>
-              <Text style={styles.savingsLabel}>Par an</Text>
-            </View>
-          </View>
-          
-          <Text style={styles.savingsNote}>
-            Calcul basé sur {profile.cigsPerDay} cigarettes/jour à {settings.pricePerCig}€ pièce
-          </Text>
-        </View>
 
-        {/* Section Paramètres */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>⚙️ Paramètres</Text>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Prix par cigarette</Text>
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.numberInput}
-                value={settings.pricePerCig.toString()}
-                onChangeText={(text) => setSettings({
-                  ...settings,
-                  pricePerCig: parseFloat(text) || 0.6,
-                })}
-                keyboardType="numeric"
-                placeholder="0.60"
-              />
-              <Text style={styles.inputSuffix}>{settings.currency}</Text>
+            {/* Économies */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIcon}>💰</Text>
+                <Text style={styles.cardTitle}>Mes Économies Potentielles</Text>
+              </View>
+              
+              <View style={styles.savingsGrid}>
+                <View style={styles.savingsItem}>
+                  <Text style={styles.savingsAmount}>{savings.daily}€</Text>
+                  <Text style={styles.savingsPeriod}>par jour</Text>
+                </View>
+                
+                <View style={styles.savingsItem}>
+                  <Text style={styles.savingsAmount}>{savings.monthly}€</Text>
+                  <Text style={styles.savingsPeriod}>par mois</Text>
+                </View>
+                
+                <View style={styles.savingsItem}>
+                  <Text style={styles.savingsAmount}>{savings.yearly}€</Text>
+                  <Text style={styles.savingsPeriod}>par an</Text>
+                </View>
+              </View>
+              
+              <Text style={styles.savingsNote}>
+                Basé sur {profile.cigsPerDay} cigarettes/jour à {settings.pricePerCig}€ pièce
+              </Text>
             </View>
-          </View>
 
-          <View style={styles.switchGroup}>
-            <Text style={styles.switchLabel}>Animations</Text>
-            <Switch
-              value={settings.animationsEnabled}
-              onValueChange={(value) => setSettings({
-                ...settings,
-                animationsEnabled: value,
-              })}
-              trackColor={{ false: '#64748B', true: '#3B82F6' }}
-              thumbColor={settings.animationsEnabled ? '#F8FAFC' : '#F8FAFC'}
-            />
-          </View>
+            {/* Paramètres */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIcon}>⚙️</Text>
+                <Text style={styles.cardTitle}>Paramètres</Text>
+              </View>
+              
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingLabel}>Notifications quotidiennes</Text>
+                  <Text style={styles.settingDescription}>Rappels pour saisir votre consommation</Text>
+                </View>
+                <Switch
+                  value={settings.notificationsAllowed}
+                  onValueChange={(value) => setSettings({
+                    ...settings,
+                    notificationsAllowed: value,
+                  })}
+                  trackColor={{ false: '#64748B', true: '#8B45FF' }}
+                  thumbColor={settings.notificationsAllowed ? '#F8FAFC' : '#F8FAFC'}
+                />
+              </View>
 
-          <TouchableOpacity style={styles.saveButton} onPress={saveSettings}>
-            <Text style={styles.saveButtonText}>💾 Sauvegarder les paramètres</Text>
-          </TouchableOpacity>
-        </View>
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingLabel}>Animations</Text>
+                  <Text style={styles.settingDescription}>Effets visuels dans l'app</Text>
+                </View>
+                <Switch
+                  value={settings.animationsEnabled}
+                  onValueChange={(value) => setSettings({
+                    ...settings,
+                    animationsEnabled: value,
+                  })}
+                  trackColor={{ false: '#64748B', true: '#8B45FF' }}
+                  thumbColor={settings.animationsEnabled ? '#F8FAFC' : '#F8FAFC'}
+                />
+              </View>
+            </View>
+
+            {/* Boutons de sauvegarde */}
+            <View style={styles.actionsContainer}>
+              <TouchableOpacity style={styles.saveButton} onPress={saveProfile}>
+                <Text style={styles.saveButtonText}>💾 Sauvegarder mon profil</Text>
+              </TouchableOpacity>
+            </View>
+
+          </View>
         </ScrollView>
       </LinearGradient>
     </View>
@@ -340,137 +417,228 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    paddingHorizontal: 20,
     zIndex: 1,
   },
-  section: {
-    marginBottom: 30,
-    marginTop: 20,
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 100,
   },
-  sectionTitle: {
-    fontSize: 20,
+  headerSection: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  avatarContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(139, 69, 255, 0.3)',
+    borderWidth: 3,
+    borderColor: 'rgba(139, 69, 255, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  avatarEmoji: {
+    fontSize: 40,
+  },
+  headerTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#F8FAFC',
-    marginBottom: 20,
+    color: '#FFFFFF',
+    marginBottom: 5,
+    textShadowColor: '#8B45FF',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#94A3B8',
     textAlign: 'center',
+  },
+  card: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  cardIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   inputGroup: {
     marginBottom: 20,
   },
-  label: {
-    color: '#F8FAFC',
+  inputLabel: {
+    color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: '600',
     marginBottom: 10,
-    fontWeight: '500',
   },
-  inputRow: {
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  numberInput: {
+  input: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    color: '#F8FAFC',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    color: '#FFFFFF',
     fontSize: 16,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
-    minWidth: 80,
-    textAlign: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  dateInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    color: '#FFFFFF',
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   inputSuffix: {
     color: '#94A3B8',
-    fontSize: 16,
-    marginLeft: 10,
-  },
-  radioGroup: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  radioOption: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    flex: 1,
-    marginHorizontal: 5,
-    alignItems: 'center',
-  },
-  radioSelected: {
-    backgroundColor: 'rgba(59, 130, 246, 0.3)',
-    borderColor: '#3B82F6',
-  },
-  radioText: {
-    color: '#94A3B8',
     fontSize: 14,
     fontWeight: '500',
   },
-  radioTextSelected: {
-    color: '#F8FAFC',
+  infoContainer: {
+    backgroundColor: 'rgba(139, 69, 255, 0.2)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 69, 255, 0.3)',
   },
-  switchGroup: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  switchLabel: {
-    color: '#F8FAFC',
+  infoText: {
+    color: '#E2E8F0',
     fontSize: 16,
-    flex: 1,
-    marginRight: 15,
+    fontWeight: '500',
   },
-  switchDescription: {
+  objectiveButtons: {
+    marginBottom: 20,
+  },
+  objectiveButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  objectiveButtonSelected: {
+    backgroundColor: 'rgba(139, 69, 255, 0.3)',
+    borderColor: 'rgba(139, 69, 255, 0.7)',
+  },
+  objectiveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  objectiveButtonTextSelected: {
+    color: '#FFFFFF',
+  },
+  objectiveButtonSubtext: {
     color: '#94A3B8',
     fontSize: 14,
-    fontStyle: 'italic',
   },
-  saveButton: {
-    backgroundColor: 'rgba(59, 130, 246, 0.8)',
-    borderRadius: 12,
-    paddingVertical: 15,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
-    marginTop: 10,
+  objectiveButtonSubtextSelected: {
+    color: '#E2E8F0',
   },
-  saveButtonText: {
-    color: '#F8FAFC',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  savingsContainer: {
+  savingsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 15,
   },
-  savingsCard: {
+  savingsItem: {
     backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    borderRadius: 12,
-    padding: 15,
+    borderRadius: 16,
+    padding: 20,
     alignItems: 'center',
     flex: 1,
-    marginHorizontal: 5,
+    marginHorizontal: 4,
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   savingsAmount: {
     color: '#10B981',
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 5,
   },
-  savingsLabel: {
+  savingsPeriod: {
     color: '#94A3B8',
     fontSize: 12,
+    fontWeight: '500',
   },
   savingsNote: {
     color: '#94A3B8',
     fontSize: 12,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    paddingVertical: 10,
+  },
+  settingInfo: {
+    flex: 1,
+    marginRight: 15,
+  },
+  settingLabel: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  settingDescription: {
+    color: '#94A3B8',
+    fontSize: 14,
+  },
+  actionsContainer: {
+    marginTop: 20,
+  },
+  saveButton: {
+    backgroundColor: 'rgba(139, 69, 255, 0.8)',
+    borderRadius: 16,
+    paddingVertical: 18,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 69, 255, 0.5)',
+    shadowColor: '#8B45FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });

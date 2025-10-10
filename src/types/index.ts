@@ -3,7 +3,18 @@ export interface UserProfile {
   startedSmokingYears: number;
   cigsPerDay: number;
   objectiveType: 'complete' | 'progressive';
-  reductionFrequency?: number; // cigarettes à réduire tous les X jours
+  reductionFrequency?: number; // cigarettes à réduire par semaine
+  
+  // Nouvelles données d'onboarding
+  smokingYears?: number;
+  smokingPeakTime?: 'morning' | 'after_meals' | 'evening' | 'all_day' | 'work_breaks';
+  mainGoal?: 'complete_stop' | 'progressive_reduction';
+  targetDate?: string; // Pour arrêt complet
+  mainMotivation?: 'health' | 'finance' | 'family' | 'sport' | 'independence';
+  previousAttempts?: 'first_time' | '1_2_times' | 'several_times' | 'many_times';
+  smokingTriggers?: ('stress' | 'boredom' | 'social' | 'after_meals' | 'coffee_alcohol' | 'phone')[];
+  smokingSituations?: ('work' | 'evenings' | 'weekends' | 'vacations' | 'constant')[];
+  onboardingCompleted?: boolean;
 }
 
 // Types pour les paramètres

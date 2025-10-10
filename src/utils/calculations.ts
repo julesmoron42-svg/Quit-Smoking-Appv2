@@ -93,62 +93,62 @@ export const calculateStatistics = (
   };
 };
 
-// Bénéfices santé selon l'OMS
+// Bénéfices santé selon l'OMS - Source officielle
 export const getHealthBenefits = (): HealthBenefit[] => [
   {
     id: '20min',
     title: '20 minutes',
-    description: 'Pression sanguine et rythme cardiaque normalisés',
+    description: 'Votre rythme cardiaque et votre pression sanguine diminuent',
     timeRequired: 20,
     unlocked: false,
   },
   {
     id: '12h',
     title: '12 heures',
-    description: 'Monoxyde de carbone normalisé',
+    description: 'Votre taux sanguin de monoxyde de carbone redevient normal',
     timeRequired: 12 * 60,
     unlocked: false,
   },
   {
-    id: '24h',
-    title: '24 heures',
-    description: 'Circulation améliorée',
-    timeRequired: 24 * 60,
+    id: '2-12weeks',
+    title: '2 à 12 semaines',
+    description: 'Votre circulation s\'améliore et votre fonction pulmonaire augmente',
+    timeRequired: 2 * 7 * 24 * 60, // 2 semaines en minutes
     unlocked: false,
   },
   {
-    id: '48h',
-    title: '48 heures',
-    description: 'Saveur et odorat améliorés',
-    timeRequired: 48 * 60,
-    unlocked: false,
-  },
-  {
-    id: '72h',
-    title: '72 heures',
-    description: 'Respiration facilitée',
-    timeRequired: 72 * 60,
-    unlocked: false,
-  },
-  {
-    id: '14days',
-    title: '14 jours',
-    description: 'Risque d\'infection réduit',
-    timeRequired: 14 * 24 * 60,
-    unlocked: false,
-  },
-  {
-    id: '30days',
-    title: '30 jours',
-    description: 'Risque de crise cardiaque réduit',
-    timeRequired: 30 * 24 * 60,
+    id: '1-9months',
+    title: '1 à 9 mois',
+    description: 'La toux et l\'essoufflement diminuent',
+    timeRequired: 30 * 24 * 60, // 1 mois en minutes
     unlocked: false,
   },
   {
     id: '1year',
     title: '1 an',
-    description: 'Risque de cancer du poumon réduit',
+    description: 'Votre risque de cardiopathie coronarienne diminue de près de moitié',
     timeRequired: 365 * 24 * 60,
+    unlocked: false,
+  },
+  {
+    id: '5years',
+    title: '5 ans',
+    description: 'Votre risque d\'accident vasculaire cérébral redevient le même que pour un non-fumeur',
+    timeRequired: 5 * 365 * 24 * 60,
+    unlocked: false,
+  },
+  {
+    id: '10years',
+    title: '10 ans',
+    description: 'Votre risque de cancer du poumon tombe à près de la moitié et votre risque de cancer de la bouche, de la gorge, de l\'œsophage, de la vessie, du col de l\'utérus et du pancréas diminue',
+    timeRequired: 10 * 365 * 24 * 60,
+    unlocked: false,
+  },
+  {
+    id: '15years',
+    title: '15 ans',
+    description: 'Le risque de cardiopathie coronarienne redevient le même que pour un non-fumeur',
+    timeRequired: 15 * 365 * 24 * 60,
     unlocked: false,
   },
 ];

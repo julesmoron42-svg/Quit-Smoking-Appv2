@@ -8,9 +8,11 @@ import {
   Dimensions,
   TextInput,
   Modal,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { useNavigation } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
 import { profileStorage, dailyEntriesStorage, settingsStorage } from '../lib/storage';
 import { 
@@ -27,6 +29,7 @@ const Tab = createMaterialTopTabNavigator();
 
 // Écran Cigarettes avec graphique
 function CigarettesScreen() {
+  const navigation = useNavigation();
   const [profile, setProfile] = useState<UserProfile>({
     startedSmokingYears: 0,
     cigsPerDay: 20,
@@ -34,25 +37,18 @@ function CigarettesScreen() {
     reductionFrequency: 1,
   });
   const [dailyEntries, setDailyEntries] = useState<Record<string, DailyEntry>>({});
-  const [selectedPoint, setSelectedPoint] = useState<{
-    visible: boolean;
-    x: number;
-    y: number;
-    value: number;
-    label: string;
-    theoreticalValue: number;
-  }>({
-    visible: false,
-    x: 0,
-    y: 0,
-    value: 0,
-    label: '',
-    theoreticalValue: 0,
-  });
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // Recharger les données quand l'écran devient visible
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadData();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const loadData = async () => {
     const [profileData, entriesData] = await Promise.all([
@@ -63,22 +59,6 @@ function CigarettesScreen() {
     setDailyEntries(entriesData);
   };
 
-  const handleDataPointClick = (data: any) => {
-    if (data && data.x !== undefined && data.y !== undefined) {
-      const index = data.index;
-      const theoreticalValue = chartData.datasets[0].data[index];
-      const realValue = chartData.datasets[1].data[index];
-      
-      setSelectedPoint({
-        visible: true,
-        x: data.x,
-        y: data.y,
-        value: realValue,
-        label: chartData.labels[index] || `Jour ${index + 1}`,
-        theoreticalValue: theoreticalValue,
-      });
-    }
-  };
 
 
   const chartData = generateCigarettesChartData(profile, dailyEntries, 30);
@@ -94,12 +74,21 @@ function CigarettesScreen() {
       borderRadius: 16,
     },
     propsForDots: {
-      r: '3', // Points visibles pour le clic
-      strokeWidth: '2',
-      stroke: '#fff',
+      r: '8', // Points invisibles mais cliquables
+      strokeWidth: '0',
+      stroke: 'transparent',
+      fill: 'transparent',
     },
     propsForLabels: {
       fontSize: 10,
+    },
+    propsForVerticalLabels: {
+      fontSize: 10,
+      dx: -10, // Décalage à gauche
+    },
+    propsForHorizontalLabels: {
+      fontSize: 10,
+      dy: 5,
     },
   };
 
@@ -129,8 +118,12 @@ function CigarettesScreen() {
               withVerticalLines={false}
               withHorizontalLines={true}
               segments={4}
-              onDataPointClick={handleDataPointClick}
+              yAxisSuffix=""
+              yAxisInterval={1}
+              paddingLeft={20}
+              paddingRight={5}
             />
+          </View>
             
             {/* Légende */}
             <View style={styles.legend}>
@@ -143,40 +136,7 @@ function CigarettesScreen() {
                 <Text style={styles.legendText}>Consommation réelle</Text>
               </View>
             </View>
-          </View>
 
-          {/* Popup de détail */}
-          <Modal
-            visible={selectedPoint.visible}
-            transparent={true}
-            animationType="fade"
-            onRequestClose={() => setSelectedPoint({...selectedPoint, visible: false})}
-          >
-            <TouchableOpacity 
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPress={() => setSelectedPoint({...selectedPoint, visible: false})}
-            >
-              <View style={styles.popupContainer}>
-                <Text style={styles.popupTitle}>Détails du jour</Text>
-                <Text style={styles.popupDate}>{selectedPoint.label}</Text>
-                <View style={styles.popupData}>
-                  <Text style={styles.popupLabel}>Théorique:</Text>
-                  <Text style={styles.popupValue}>{selectedPoint.theoreticalValue} cig</Text>
-                </View>
-                <View style={styles.popupData}>
-                  <Text style={styles.popupLabel}>Réel:</Text>
-                  <Text style={styles.popupValue}>{selectedPoint.value} cig</Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.popupCloseButton}
-                  onPress={() => setSelectedPoint({...selectedPoint, visible: false})}
-                >
-                  <Text style={styles.popupCloseText}>Fermer</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          </Modal>
           
         </ScrollView>
       </LinearGradient>
@@ -186,6 +146,7 @@ function CigarettesScreen() {
 
 // Écran Économies avec graphique cumulatif
 function SavingsScreen() {
+  const navigation = useNavigation();
   const [profile, setProfile] = useState<UserProfile>({
     startedSmokingYears: 0,
     cigsPerDay: 20,
@@ -204,6 +165,14 @@ function SavingsScreen() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Recharger les données quand l'écran devient visible
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadData();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const loadData = async () => {
     const [profileData, settingsData, entriesData] = await Promise.all([
@@ -348,43 +317,95 @@ function HealthScreen() {
           Vos progrès selon les données de l'Organisation Mondiale de la Santé
         </Text>
         
-        {updatedBenefits.map((benefit) => (
-          <View
-            key={benefit.id}
-            style={[
-              styles.healthCard,
-              benefit.unlocked && styles.healthCardUnlocked,
-            ]}
-          >
-            <View style={styles.healthHeader}>
+        {updatedBenefits.map((benefit) => {
+          const progress = Math.min(100, (sessionElapsed / (benefit.timeRequired * 60 * 1000)) * 100);
+          const timeRemaining = Math.max(0, benefit.timeRequired * 60 * 1000 - sessionElapsed);
+          
+          // Calculer le temps restant en format lisible
+          const daysRemaining = Math.ceil(timeRemaining / (24 * 60 * 60 * 1000));
+          const yearsRemaining = Math.floor(daysRemaining / 365);
+          const remainingDays = daysRemaining % 365;
+          
+          let timeRemainingText = '';
+          if (benefit.unlocked) {
+            timeRemainingText = '✅ Atteint !';
+          } else if (yearsRemaining > 0) {
+            timeRemainingText = `${yearsRemaining} an${yearsRemaining > 1 ? 's' : ''} et ${remainingDays} jour${remainingDays > 1 ? 's' : ''} restant${yearsRemaining > 1 || remainingDays > 1 ? 's' : ''}`;
+          } else {
+            timeRemainingText = `${daysRemaining} jour${daysRemaining > 1 ? 's' : ''} restant${daysRemaining > 1 ? 's' : ''}`;
+          }
+
+          return (
+            <View
+              key={benefit.id}
+              style={[
+                styles.healthCard,
+                benefit.unlocked && styles.healthCardUnlocked,
+              ]}
+            >
+              <View style={styles.healthHeader}>
+                <Text style={[
+                  styles.healthTitle,
+                  benefit.unlocked && styles.healthTitleUnlocked,
+                ]}>
+                  {benefit.title}
+                </Text>
+                <Text style={styles.healthIcon}>
+                  {benefit.unlocked ? '✅' : '⏳'}
+                </Text>
+              </View>
               <Text style={[
-                styles.healthTitle,
-                benefit.unlocked && styles.healthTitleUnlocked,
+                styles.healthDescription,
+                benefit.unlocked && styles.healthDescriptionUnlocked,
               ]}>
-                {benefit.title}
+                {benefit.description}
               </Text>
-              <Text style={styles.healthIcon}>
-                {benefit.unlocked ? '✅' : '⏳'}
-              </Text>
+              
+              {/* Barre de progression */}
+              <View style={styles.progressContainer}>
+                <View style={styles.progressBar}>
+                  <View 
+                    style={[
+                      styles.progressFill,
+                      { width: `${progress}%` },
+                      benefit.unlocked && styles.progressFillCompleted
+                    ]} 
+                  />
+                </View>
+                <View style={styles.progressInfo}>
+                  <Text style={[
+                    styles.progressPercentage,
+                    benefit.unlocked && styles.progressPercentageCompleted
+                  ]}>
+                    {Math.round(progress)}%
+                  </Text>
+                  <Text style={[
+                    styles.timeRemaining,
+                    benefit.unlocked && styles.timeRemainingCompleted
+                  ]}>
+                    {timeRemainingText}
+                  </Text>
+                </View>
+              </View>
             </View>
-            <Text style={[
-              styles.healthDescription,
-              benefit.unlocked && styles.healthDescriptionUnlocked,
-            ]}>
-              {benefit.description}
-            </Text>
-            {benefit.unlocked && benefit.unlockedAt && (
-              <Text style={styles.healthUnlockedAt}>
-                Débloqué le {new Date(benefit.unlockedAt).toLocaleDateString('fr-FR')}
-              </Text>
-            )}
-          </View>
-        ))}
+          );
+        })}
         
         <View style={styles.sourceContainer}>
           <Text style={styles.sourceText}>
             Source : Organisation Mondiale de la Santé (OMS)
           </Text>
+          <TouchableOpacity 
+            style={styles.sourceLink}
+            onPress={() => {
+              // Ouvrir le lien OMS dans le navigateur
+              Linking.openURL('https://www.who.int/fr/news-room/questions-and-answers/item/tobacco-health-benefits-of-smoking-cessation');
+            }}
+          >
+            <Text style={styles.sourceLinkText}>
+              En savoir plus sur les bienfaits du sevrage tabagique
+            </Text>
+          </TouchableOpacity>
         </View>
         </ScrollView>
       </LinearGradient>
@@ -460,9 +481,12 @@ function GoalsScreen() {
 }
 
 // Composant principal avec navigation par onglets
-export default function AnalyticsTab() {
+export default function AnalyticsTab({ route }: any) {
+  const initialRoute = route?.params?.initialRoute || 'Cigarettes';
+  
   return (
     <Tab.Navigator
+      initialRouteName={initialRoute}
       screenOptions={{
         tabBarStyle: {
           backgroundColor: '#0F172A',
@@ -637,23 +661,73 @@ const styles = StyleSheet.create({
   healthDescriptionUnlocked: {
     color: '#94A3B8',
   },
-  healthUnlockedAt: {
-    color: '#10B981',
+  progressContainer: {
+    marginTop: 15,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#3B82F6',
+    borderRadius: 4,
+  },
+  progressFillCompleted: {
+    backgroundColor: '#10B981',
+  },
+  progressInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  progressPercentage: {
+    color: '#94A3B8',
     fontSize: 12,
-    marginTop: 5,
+    fontWeight: 'bold',
+  },
+  progressPercentageCompleted: {
+    color: '#10B981',
+  },
+  timeRemaining: {
+    color: '#64748B',
+    fontSize: 11,
     fontStyle: 'italic',
+  },
+  timeRemainingCompleted: {
+    color: '#10B981',
+    fontWeight: 'bold',
   },
   sourceContainer: {
     marginTop: 20,
     padding: 15,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 8,
+    alignItems: 'center',
   },
   sourceText: {
     color: '#64748B',
     fontSize: 12,
     textAlign: 'center',
     fontStyle: 'italic',
+    marginBottom: 10,
+  },
+  sourceLink: {
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.3)',
+  },
+  sourceLinkText: {
+    color: '#3B82F6',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   goalForm: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -840,5 +914,30 @@ const styles = StyleSheet.create({
     color: '#60a5fa',
     fontSize: 14,
     fontWeight: '500',
+  },
+  chartPopup: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    borderRadius: 8,
+    padding: 12,
+    minWidth: 120,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    zIndex: 1000,
+  },
+  simplePopup: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: 4,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    zIndex: 1000,
+  },
+  simplePopupText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });

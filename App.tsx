@@ -41,10 +41,11 @@ export default function App() {
             backgroundColor: '#0F172A',
             borderTopColor: '#1E293B',
             borderTopWidth: 1,
-            height: 60,
-            paddingBottom: 8,
-            paddingTop: 8,
+            height: 80,
+            paddingBottom: 12,
+            paddingTop: 12,
           },
+          tabBarShowLabel: false,
           headerStyle: {
             backgroundColor: '#071033',
             borderBottomColor: '#1E293B',
@@ -61,7 +62,7 @@ export default function App() {
           name="Accueil" 
           component={MainTab}
           options={{
-            title: '🌱 MyQuitZone',
+            title: '🌱',
             headerTitle: '🌱 MyQuitZone',
           }}
         />
@@ -69,7 +70,7 @@ export default function App() {
           name="Profil" 
           component={ProfileTab}
           options={{
-            title: '👤 Profil',
+            title: '👤',
             headerTitle: '👤 Mon Profil',
           }}
         />
@@ -77,7 +78,7 @@ export default function App() {
           name="Analytics" 
           component={AnalyticsTab}
           options={{
-            title: '📊 Analytics',
+            title: '📊',
             headerTitle: '📊 Mes Statistiques',
           }}
         />
@@ -85,7 +86,7 @@ export default function App() {
           name="Réglages" 
           component={SettingsTab}
           options={{
-            title: '⚙️ Réglages',
+            title: '⚙️',
             headerTitle: '⚙️ Paramètres',
           }}
         />

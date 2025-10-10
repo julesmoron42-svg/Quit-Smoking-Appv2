@@ -27,6 +27,7 @@ const DEFAULT_PROFILE: UserProfile = {
   cigsPerDay: 20,
   objectiveType: 'complete',
   reductionFrequency: 1,
+  onboardingCompleted: false,
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
