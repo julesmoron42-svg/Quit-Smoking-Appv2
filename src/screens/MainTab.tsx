@@ -11,8 +11,6 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { sessionStorage, dailyEntriesStorage, streakStorage, profileStorage, settingsStorage } from '../lib/storage';
-import { DataSyncService } from '../lib/dataSync';
-import { useAuth } from '../contexts/AuthContext';
 import { 
   formatTime, 
   getBallColor, 
@@ -34,7 +32,6 @@ const { width } = Dimensions.get('window');
 
 export default function MainTab() {
   const navigation = useNavigation() as any;
-  const { user } = useAuth();
   const [session, setSession] = useState<TimerSession>({
     isRunning: false,
     startTimestamp: null,
@@ -56,7 +53,6 @@ export default function MainTab() {
     language: 'fr',
     animationsEnabled: true,
   });
-  const [healthBenefits, setHealthBenefits] = useState<any[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const [onboardingVisible, setOnboardingVisible] = useState(false);
@@ -105,13 +101,10 @@ export default function MainTab() {
     let interval: NodeJS.Timeout;
     
     if (session.isRunning && session.startTimestamp) {
-      interval = setInterval(async () => {
+      interval = setInterval(() => {
         const now = Date.now();
         const elapsedTime = now - session.startTimestamp! + session.elapsedBeforePause;
         setElapsed(elapsedTime);
-        
-        // Vérifier les bienfaits santé
-        await checkHealthBenefits();
       }, 1000);
     } else {
       setElapsed(session.elapsedBeforePause);
@@ -120,38 +113,18 @@ export default function MainTab() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [session, healthBenefits]);
+  }, [session]);
 
-  const checkHealthBenefits = async () => {
+  const getCurrentHealthBenefits = () => {
     const minutesElapsed = Math.floor(elapsed / (1000 * 60));
-    let benefitsUpdated = false;
+    const defaultBenefits = getHealthBenefits();
     
-    const updatedBenefits = healthBenefits.map(benefit => {
-      if (minutesElapsed >= benefit.timeRequired && !benefit.unlocked) {
-        benefitsUpdated = true;
-        return {
-          ...benefit,
-          unlocked: true,
-          unlockedAt: new Date().toISOString(),
-        };
-      }
-      return benefit;
-    });
-    
-    if (benefitsUpdated) {
-      setHealthBenefits(updatedBenefits);
-      
-      // Sauvegarder dans Supabase si l'utilisateur est connecté
-      if (user?.id) {
-        try {
-          await DataSyncService.syncHealthBenefits(user.id, updatedBenefits);
-        } catch (error) {
-          console.error('Erreur lors de la sauvegarde des bienfaits:', error);
-        }
-      }
-    }
-    
-    return updatedBenefits;
+    // Mettre à jour les bienfaits en fonction du temps écoulé actuel
+    return defaultBenefits.map(benefit => ({
+      ...benefit,
+      unlocked: minutesElapsed >= benefit.timeRequired,
+      unlockedAt: minutesElapsed >= benefit.timeRequired ? new Date().toISOString() : undefined,
+    }));
   };
 
   const loadData = async () => {
@@ -160,7 +133,7 @@ export default function MainTab() {
         sessionStorage.get(),
         dailyEntriesStorage.get(),
         streakStorage.get(),
-        profileStorage.get(user?.id),
+        profileStorage.get(),
         settingsStorage.get(),
       ]);
       
@@ -170,26 +143,7 @@ export default function MainTab() {
       setProfile(profileData);
       setSettings(settingsData);
 
-      // Charger les bienfaits santé depuis Supabase si l'utilisateur est connecté
-      if (user?.id) {
-        try {
-          const { data: remoteBenefits } = await DataSyncService.getHealthBenefits(user.id);
-          if (remoteBenefits && remoteBenefits.length > 0) {
-            setHealthBenefits(remoteBenefits);
-          } else {
-            // Initialiser avec les bienfaits par défaut
-            const defaultBenefits = getHealthBenefits();
-            setHealthBenefits(defaultBenefits);
-          }
-        } catch (error) {
-          console.log('Utilisation des bienfaits par défaut');
-          const defaultBenefits = getHealthBenefits();
-          setHealthBenefits(defaultBenefits);
-        }
-      } else {
-        const defaultBenefits = getHealthBenefits();
-        setHealthBenefits(defaultBenefits);
-      }
+      // Les bienfaits santé sont calculés en temps réel basés sur le compteur
 
       // Calculer le temps écoulé basé sur la session
       const now = Date.now();
@@ -492,6 +446,22 @@ export default function MainTab() {
         </View>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.content}>
+          
+          {/* Compteur des bienfaits santé */}
+          <View style={styles.objectivesContainer}>
+            <TouchableOpacity style={styles.objectiveCard} onPress={() => {
+              navigation.navigate('Analytics', { initialRoute: 'Santé' });
+            }}>
+              <Text style={styles.objectiveTitle}>🎯 Objectifs santé</Text>
+              <Text style={styles.objectiveSubtitle}>Suivez vos progrès</Text>
+              <View style={styles.objectiveProgress}>
+                <Text style={styles.objectiveProgressText}>
+                  {getCurrentHealthBenefits().filter(b => b.unlocked).length} / {getCurrentHealthBenefits().length} débloqués
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+          
           {/* Frise des 7 jours */}
           <View style={styles.sevenDaysContainer}>
             <View style={styles.daysLabels}>
@@ -687,10 +657,10 @@ export default function MainTab() {
             <Text style={styles.sectionTitle}>🏥 Dernier bénéfice santé</Text>
             
             {(() => {
-              const updatedBenefits = updateUnlockedHealthBenefits(healthBenefits, elapsed);
+              const currentBenefits = getCurrentHealthBenefits();
               
               // Trouver le dernier objectif accompli
-              const accomplishedGoals = updatedBenefits.filter(benefit => benefit.unlocked);
+              const accomplishedGoals = currentBenefits.filter(benefit => benefit.unlocked);
               
               if (accomplishedGoals.length === 0) {
                 return (
@@ -1228,5 +1198,36 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 12,
     textAlign: 'center',
+  },
+  objectivesContainer: {
+    marginBottom: 20,
+  },
+  objectiveCard: {
+    backgroundColor: 'rgba(30, 41, 59, 0.8)',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(71, 85, 105, 0.3)',
+  },
+  objectiveTitle: {
+    color: '#F8FAFC',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  objectiveSubtitle: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  objectiveProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  objectiveProgressText: {
+    color: '#10B981',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
