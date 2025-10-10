@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
-// Import des écrans
+// Import des contextes et écrans
+import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+import { AuthScreen } from './src/screens/AuthScreen';
 import MainTab from './src/screens/MainTab';
 import ProfileTab from './src/screens/ProfileTab';
 import AnalyticsTab from './src/screens/AnalyticsTab';
@@ -12,7 +15,35 @@ import SettingsTab from './src/screens/SettingsTab';
 
 const Tab = createBottomTabNavigator();
 
-export default function App() {
+// Composant pour l'application principale avec navigation
+function MainApp() {
+  const { user, loading } = useAuth();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    if (user && !loading) {
+      setIsAuthenticated(true);
+    } else if (!user && !loading) {
+      setIsAuthenticated(false);
+    }
+  }, [user, loading]);
+
+  const handleAuthSuccess = () => {
+    setIsAuthenticated(true);
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <AuthScreen onAuthSuccess={handleAuthSuccess} />;
+  }
+
   return (
     <NavigationContainer>
       <StatusBar style="light" backgroundColor="#071033" />
@@ -94,3 +125,21 @@ export default function App() {
     </NavigationContainer>
   );
 }
+
+// Composant principal avec le provider d'authentification
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
+  );
+}
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#071033',
+  },
+});

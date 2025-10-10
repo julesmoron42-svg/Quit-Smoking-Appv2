@@ -158,8 +158,8 @@ export default function OnboardingModal({ visible, onComplete }: OnboardingModal
       Alert.alert('Erreur', 'Veuillez sélectionner une date d\'arrêt');
       return false;
     }
-    if (data.mainGoal === 'progressive_reduction' && !data.reductionFrequency) {
-      Alert.alert('Erreur', 'Veuillez définir la fréquence de réduction');
+    if (data.mainGoal === 'progressive_reduction' && (!data.reductionFrequency || data.reductionFrequency < 1)) {
+      Alert.alert('Erreur', 'Veuillez définir une fréquence de réduction valide (au moins 1 cigarette par semaine)');
       return false;
     }
     
@@ -211,6 +211,11 @@ export default function OnboardingModal({ visible, onComplete }: OnboardingModal
         const maxWeeklyReduction = Math.floor(cigsPerWeek * 0.2); // Maximum 20% de réduction hebdomadaire
         const minWeeklyReduction = 1; // Minimum 1 cigarette par semaine
         const currentValue = data[question.key as keyof OnboardingData] as number || minWeeklyReduction;
+        
+        // Initialiser la valeur par défaut si elle n'existe pas
+        if (!data[question.key as keyof OnboardingData]) {
+          handleInputChange(question.key, minWeeklyReduction);
+        }
         
         return (
           <View style={styles.sliderContainer}>

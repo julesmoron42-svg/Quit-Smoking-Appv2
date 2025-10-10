@@ -13,8 +13,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as FileSystem from 'expo-file-system';
 import { settingsStorage, exportAllData, importData, storage } from '../lib/storage';
 import { AppSettings, ExportData } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function SettingsTab() {
+  const { user, signOut } = useAuth();
   const [settings, setSettings] = useState<AppSettings>({
     pricePerCig: 0.6,
     currency: '€',
@@ -110,6 +112,27 @@ export default function SettingsTab() {
     );
   };
 
+  const handleSignOut = () => {
+    Alert.alert(
+      'Se déconnecter',
+      'Êtes-vous sûr de vouloir vous déconnecter ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Se déconnecter',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await signOut();
+            } catch (error) {
+              Alert.alert('Erreur', 'Impossible de se déconnecter');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const showAbout = () => {
     Alert.alert(
       '🌱 MyQuitZone',
@@ -121,9 +144,38 @@ export default function SettingsTab() {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#071033', '#1a1a2e', '#16213e', '#071033']}
+        colors={['#0a0a0a', '#1a1a2e', '#16213e', '#0f3460']}
         style={styles.gradientContainer}
       >
+        {/* Fond étoilé */}
+        <View style={styles.starryBackground}>
+          {Array.from({ length: 20 }).map((_, i) => {
+            const positions = [
+              { left: 10, top: 15 }, { left: 25, top: 8 }, { left: 40, top: 20 }, { left: 60, top: 12 }, { left: 80, top: 18 },
+              { left: 90, top: 25 }, { left: 15, top: 35 }, { left: 35, top: 40 }, { left: 55, top: 32 }, { left: 75, top: 38 },
+              { left: 85, top: 45 }, { left: 20, top: 55 }, { left: 45, top: 60 }, { left: 65, top: 52 }, { left: 85, top: 58 },
+              { left: 12, top: 70 }, { left: 30, top: 75 }, { left: 50, top: 68 }, { left: 70, top: 72 }, { left: 88, top: 78 }
+            ];
+            
+            const pos = positions[i % positions.length];
+            const size = Math.random() * 3 + 2;
+            
+            return (
+              <View
+                key={i}
+                style={[
+                  styles.star,
+                  {
+                    left: pos.left + '%' as any,
+                    top: pos.top + '%' as any,
+                    width: size,
+                    height: size,
+                  },
+                ]}
+              />
+            );
+          })}
+        </View>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Section Paramètres */}
         <View style={styles.section}>
@@ -284,6 +336,27 @@ export default function SettingsTab() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Section Compte */}
+        {user && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>👤 Mon compte</Text>
+            
+            <View style={styles.accountInfo}>
+              <Text style={styles.accountEmail}>{user.email}</Text>
+              <Text style={styles.accountDescription}>
+                Connecté avec Supabase
+              </Text>
+            </View>
+
+            <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+              <Text style={styles.signOutButtonText}>🚪 Se déconnecter</Text>
+              <Text style={styles.signOutButtonDescription}>
+                Déconnectez-vous de votre compte
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
         </ScrollView>
       </LinearGradient>
     </View>
@@ -475,5 +548,58 @@ const styles = StyleSheet.create({
   supportButtonDescription: {
     color: '#94A3B8',
     fontSize: 12,
+  },
+  accountInfo: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  accountEmail: {
+    color: '#F8FAFC',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  accountDescription: {
+    color: '#94A3B8',
+    fontSize: 12,
+  },
+  signOutButton: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderRadius: 12,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  signOutButtonText: {
+    color: '#EF4444',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  signOutButtonDescription: {
+    color: '#FCA5A5',
+    fontSize: 12,
+  },
+  starryBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 0,
+  },
+  star: {
+    position: 'absolute',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 1,
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 4,
   },
 });

@@ -1,5 +1,6 @@
 // Types pour le profil utilisateur
 export interface UserProfile {
+  id?: string; // ID de l'utilisateur Supabase
   startedSmokingYears: number;
   cigsPerDay: number;
   objectiveType: 'complete' | 'progressive';
@@ -15,6 +16,8 @@ export interface UserProfile {
   smokingTriggers?: ('stress' | 'boredom' | 'social' | 'after_meals' | 'coffee_alcohol' | 'phone')[];
   smokingSituations?: ('work' | 'evenings' | 'weekends' | 'vacations' | 'constant')[];
   onboardingCompleted?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Types pour les paramètres

@@ -9,6 +9,7 @@ import {
   Achievement,
   ExportData 
 } from '../types';
+import { DataSyncService } from './dataSync';
 
 // Clés de stockage
 const STORAGE_KEYS = {
@@ -88,12 +89,39 @@ export const storage = {
 
 // Fonctions spécifiques pour chaque type de données
 export const profileStorage = {
-  async get(): Promise<UserProfile> {
-    return storage.get(STORAGE_KEYS.PROFILE, DEFAULT_PROFILE);
+  async get(userId?: string): Promise<UserProfile> {
+    const localProfile = await storage.get(STORAGE_KEYS.PROFILE, DEFAULT_PROFILE);
+    
+    // Si on a un userId, essayer de récupérer depuis Supabase
+    if (userId) {
+      try {
+        const { data: remoteProfile } = await DataSyncService.getUserProfile(userId);
+        if (remoteProfile) {
+          // Fusionner les données locales et distantes
+          const mergedProfile = { ...localProfile, ...remoteProfile };
+          await storage.set(STORAGE_KEYS.PROFILE, mergedProfile);
+          return mergedProfile;
+        }
+      } catch (error) {
+        console.log('Utilisation des données locales pour le profil');
+      }
+    }
+    
+    return localProfile;
   },
 
-  async set(profile: UserProfile): Promise<void> {
-    return storage.set(STORAGE_KEYS.PROFILE, profile);
+  async set(profile: UserProfile, userId?: string): Promise<void> {
+    // Sauvegarder localement
+    await storage.set(STORAGE_KEYS.PROFILE, profile);
+    
+    // Synchroniser avec Supabase si on a un userId
+    if (userId) {
+      try {
+        await DataSyncService.syncUserProfile(userId, profile);
+      } catch (error) {
+        console.log('Erreur de synchronisation du profil:', error);
+      }
+    }
   },
 };
 

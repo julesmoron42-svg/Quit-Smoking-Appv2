@@ -137,9 +137,39 @@ export default function ProfileTab() {
       </View>
       
       <LinearGradient
-        colors={['#071033', '#1a1a2e', '#16213e', '#071033']}
+        colors={['#0a0a0a', '#1a1a2e', '#16213e', '#0f3460']}
         style={styles.gradientContainer}
       >
+        {/* Fond étoilé */}
+        <View style={styles.starryBackground}>
+          {Array.from({ length: 25 }).map((_, i) => {
+            const positions = [
+              { left: 10, top: 15 }, { left: 25, top: 8 }, { left: 40, top: 20 }, { left: 60, top: 12 }, { left: 80, top: 18 },
+              { left: 90, top: 25 }, { left: 15, top: 35 }, { left: 35, top: 40 }, { left: 55, top: 32 }, { left: 75, top: 38 },
+              { left: 85, top: 45 }, { left: 20, top: 55 }, { left: 45, top: 60 }, { left: 65, top: 52 }, { left: 85, top: 58 },
+              { left: 12, top: 70 }, { left: 30, top: 75 }, { left: 50, top: 68 }, { left: 70, top: 72 }, { left: 88, top: 78 },
+              { left: 18, top: 85 }, { left: 38, top: 88 }, { left: 58, top: 82 }, { left: 78, top: 85 }, { left: 92, top: 90 }
+            ];
+            
+            const pos = positions[i % positions.length];
+            const size = Math.random() * 3 + 2;
+            
+            return (
+              <View
+                key={i}
+                style={[
+                  styles.star,
+                  {
+                    left: pos.left + '%' as any,
+                    top: pos.top + '%' as any,
+                    width: size,
+                    height: size,
+                  },
+                ]}
+              />
+            );
+          })}
+        </View>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.content}>
             
@@ -640,5 +670,23 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  starryBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 0,
+  },
+  star: {
+    position: 'absolute',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 1,
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 4,
   },
 });
