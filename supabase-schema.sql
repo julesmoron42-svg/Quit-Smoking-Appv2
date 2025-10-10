@@ -83,6 +83,19 @@ CREATE TABLE IF NOT EXISTS user_streaks (
   UNIQUE(user_id)
 );
 
+-- Table des bienfaits santé
+CREATE TABLE IF NOT EXISTS health_benefits (
+  id TEXT PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  time_required INTEGER NOT NULL, -- en minutes
+  unlocked BOOLEAN NOT NULL DEFAULT FALSE,
+  unlocked_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Fonction pour mettre à jour automatiquement updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -99,6 +112,7 @@ CREATE TRIGGER update_daily_entries_updated_at BEFORE UPDATE ON daily_entries FO
 CREATE TRIGGER update_financial_goals_updated_at BEFORE UPDATE ON financial_goals FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_achievements_updated_at BEFORE UPDATE ON achievements FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_user_streaks_updated_at BEFORE UPDATE ON user_streaks FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_health_benefits_updated_at BEFORE UPDATE ON health_benefits FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Politiques de sécurité RLS (Row Level Security)
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
@@ -107,6 +121,7 @@ ALTER TABLE daily_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE financial_goals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE achievements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_streaks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE health_benefits ENABLE ROW LEVEL SECURITY;
 
 -- Politiques pour user_profiles
 CREATE POLICY "Users can view their own profile" ON user_profiles FOR SELECT USING (auth.uid() = id);
@@ -140,3 +155,9 @@ CREATE POLICY "Users can delete their own achievements" ON achievements FOR DELE
 CREATE POLICY "Users can view their own streak" ON user_streaks FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can update their own streak" ON user_streaks FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert their own streak" ON user_streaks FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Politiques pour health_benefits
+CREATE POLICY "Users can view their own health benefits" ON health_benefits FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can update their own health benefits" ON health_benefits FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own health benefits" ON health_benefits FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own health benefits" ON health_benefits FOR DELETE USING (auth.uid() = user_id);

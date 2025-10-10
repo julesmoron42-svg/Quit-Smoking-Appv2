@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { UserProfile, AppSettings, DailyEntry, FinancialGoal, Achievement, StreakData, TimerSession } from '../types';
+import { UserProfile, AppSettings, DailyEntry, FinancialGoal, Achievement, StreakData, TimerSession, HealthBenefit } from '../types';
 
 export class DataSyncService {
   // Synchroniser le profil utilisateur
@@ -238,6 +238,45 @@ export class DataSyncService {
       return { data, error: null };
     } catch (error) {
       console.error('Erreur lors de la récupération de la série:', error);
+      return { data: null, error };
+    }
+  }
+
+  // Synchroniser les bienfaits santé
+  static async syncHealthBenefits(userId: string, benefits: HealthBenefit[]) {
+    try {
+      const benefitsWithUserId = benefits.map(benefit => ({
+        ...benefit,
+        user_id: userId,
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { data, error } = await supabase
+        .from('health_benefits')
+        .upsert(benefitsWithUserId)
+        .select();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation des bienfaits santé:', error);
+      return { data: null, error };
+    }
+  }
+
+  // Récupérer les bienfaits santé
+  static async getHealthBenefits(userId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('health_benefits')
+        .select('*')
+        .eq('user_id', userId)
+        .order('time_required', { ascending: true });
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('Erreur lors de la récupération des bienfaits santé:', error);
       return { data: null, error };
     }
   }

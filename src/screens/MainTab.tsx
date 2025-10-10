@@ -8,8 +8,11 @@ import {
   Dimensions,
   ScrollView,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { sessionStorage, dailyEntriesStorage, streakStorage, profileStorage, settingsStorage } from '../lib/storage';
+import { DataSyncService } from '../lib/dataSync';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   formatTime, 
   getBallColor, 
@@ -30,6 +33,8 @@ import OnboardingModal, { OnboardingData } from '../components/OnboardingModal';
 const { width } = Dimensions.get('window');
 
 export default function MainTab() {
+  const navigation = useNavigation() as any;
+  const { user } = useAuth();
   const [session, setSession] = useState<TimerSession>({
     isRunning: false,
     startTimestamp: null,
@@ -51,6 +56,7 @@ export default function MainTab() {
     language: 'fr',
     animationsEnabled: true,
   });
+  const [healthBenefits, setHealthBenefits] = useState<any[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const [onboardingVisible, setOnboardingVisible] = useState(false);
@@ -99,10 +105,13 @@ export default function MainTab() {
     let interval: NodeJS.Timeout;
     
     if (session.isRunning && session.startTimestamp) {
-      interval = setInterval(() => {
+      interval = setInterval(async () => {
         const now = Date.now();
         const elapsedTime = now - session.startTimestamp! + session.elapsedBeforePause;
         setElapsed(elapsedTime);
+        
+        // Vérifier les bienfaits santé
+        await checkHealthBenefits();
       }, 1000);
     } else {
       setElapsed(session.elapsedBeforePause);
@@ -111,7 +120,39 @@ export default function MainTab() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [session]);
+  }, [session, healthBenefits]);
+
+  const checkHealthBenefits = async () => {
+    const minutesElapsed = Math.floor(elapsed / (1000 * 60));
+    let benefitsUpdated = false;
+    
+    const updatedBenefits = healthBenefits.map(benefit => {
+      if (minutesElapsed >= benefit.timeRequired && !benefit.unlocked) {
+        benefitsUpdated = true;
+        return {
+          ...benefit,
+          unlocked: true,
+          unlockedAt: new Date().toISOString(),
+        };
+      }
+      return benefit;
+    });
+    
+    if (benefitsUpdated) {
+      setHealthBenefits(updatedBenefits);
+      
+      // Sauvegarder dans Supabase si l'utilisateur est connecté
+      if (user?.id) {
+        try {
+          await DataSyncService.syncHealthBenefits(user.id, updatedBenefits);
+        } catch (error) {
+          console.error('Erreur lors de la sauvegarde des bienfaits:', error);
+        }
+      }
+    }
+    
+    return updatedBenefits;
+  };
 
   const loadData = async () => {
     try {
@@ -119,7 +160,7 @@ export default function MainTab() {
         sessionStorage.get(),
         dailyEntriesStorage.get(),
         streakStorage.get(),
-        profileStorage.get(),
+        profileStorage.get(user?.id),
         settingsStorage.get(),
       ]);
       
@@ -128,6 +169,40 @@ export default function MainTab() {
       setStreak(streakData);
       setProfile(profileData);
       setSettings(settingsData);
+
+      // Charger les bienfaits santé depuis Supabase si l'utilisateur est connecté
+      if (user?.id) {
+        try {
+          const { data: remoteBenefits } = await DataSyncService.getHealthBenefits(user.id);
+          if (remoteBenefits && remoteBenefits.length > 0) {
+            setHealthBenefits(remoteBenefits);
+          } else {
+            // Initialiser avec les bienfaits par défaut
+            const defaultBenefits = getHealthBenefits();
+            setHealthBenefits(defaultBenefits);
+          }
+        } catch (error) {
+          console.log('Utilisation des bienfaits par défaut');
+          const defaultBenefits = getHealthBenefits();
+          setHealthBenefits(defaultBenefits);
+        }
+      } else {
+        const defaultBenefits = getHealthBenefits();
+        setHealthBenefits(defaultBenefits);
+      }
+
+      // Calculer le temps écoulé basé sur la session
+      const now = Date.now();
+      const elapsedTime = sessionData.isRunning && sessionData.startTimestamp
+        ? now - sessionData.startTimestamp + sessionData.elapsedBeforePause
+        : sessionData.elapsedBeforePause;
+
+      setElapsed(elapsedTime);
+
+      // Vérifier si c'est la première utilisation
+      if (!profileData.onboardingCompleted) {
+        setOnboardingVisible(true);
+      }
     } catch (error) {
       console.error('Erreur lors du chargement des données:', error);
     }
@@ -612,7 +687,6 @@ export default function MainTab() {
             <Text style={styles.sectionTitle}>🏥 Dernier bénéfice santé</Text>
             
             {(() => {
-              const healthBenefits = getHealthBenefits();
               const updatedBenefits = updateUnlockedHealthBenefits(healthBenefits, elapsed);
               
               // Trouver le dernier objectif accompli
@@ -624,7 +698,7 @@ export default function MainTab() {
                     style={styles.healthGoalCard}
                     onPress={() => {
                       // Navigation vers l'onglet Analytics avec paramètre pour aller à Santé
-                      // @ts-ignore
+                      console.log('MainTab - Navigating to Analytics with initialRoute: Santé');
                       navigation.navigate('Analytics', { initialRoute: 'Santé' });
                     }}
                   >
@@ -646,7 +720,7 @@ export default function MainTab() {
                   style={[styles.healthGoalCard, styles.healthGoalCardAccomplished]}
                   onPress={() => {
                     // Navigation vers l'onglet Analytics avec paramètre pour aller à Santé
-                    // @ts-ignore
+                    console.log('MainTab - Navigating to Analytics with initialRoute: Santé');
                     navigation.navigate('Analytics', { initialRoute: 'Santé' });
                   }}
                 >

@@ -107,6 +107,7 @@ export interface HealthBenefit {
   timeRequired: number; // en minutes
   unlocked: boolean;
   unlockedAt?: string;
+  userId?: string; // Pour la synchronisation Supabase
 }
 
 // Types pour les statistiques

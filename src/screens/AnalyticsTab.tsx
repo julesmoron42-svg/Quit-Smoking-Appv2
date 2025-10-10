@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
 import { profileStorage, dailyEntriesStorage, settingsStorage } from '../lib/storage';
 import { 
@@ -598,10 +598,25 @@ function GoalsScreen() {
 
 // Composant principal avec navigation par onglets
 export default function AnalyticsTab({ route }: any) {
+  const tabNavigatorRef = React.useRef<any>(null);
   const initialRoute = route?.params?.initialRoute || 'Cigarettes';
+  console.log('AnalyticsTab - initialRoute:', initialRoute);
+  console.log('AnalyticsTab - route params:', route?.params);
+  
+  // Naviguer vers l'onglet spécifié quand le composant est monté
+  React.useEffect(() => {
+    if (route?.params?.initialRoute && tabNavigatorRef.current) {
+      console.log('AnalyticsTab - Navigating to:', route.params.initialRoute);
+      // Petit délai pour s'assurer que le navigateur est prêt
+      setTimeout(() => {
+        tabNavigatorRef.current?.navigate(route.params.initialRoute);
+      }, 100);
+    }
+  }, [route?.params?.initialRoute]);
   
   return (
     <Tab.Navigator
+      ref={tabNavigatorRef}
       initialRouteName={initialRoute}
       screenOptions={{
         tabBarStyle: {
