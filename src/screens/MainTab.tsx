@@ -116,14 +116,13 @@ export default function MainTab() {
   }, [session]);
 
   const getCurrentHealthBenefits = () => {
-    const minutesElapsed = Math.floor(elapsed / (1000 * 60));
     const defaultBenefits = getHealthBenefits();
     
-    // Mettre à jour les bienfaits en fonction du temps écoulé actuel
+    // Mettre à jour les bienfaits en fonction du temps écoulé actuel (en millisecondes)
     return defaultBenefits.map(benefit => ({
       ...benefit,
-      unlocked: minutesElapsed >= benefit.timeRequired,
-      unlockedAt: minutesElapsed >= benefit.timeRequired ? new Date().toISOString() : undefined,
+      unlocked: elapsed >= benefit.timeRequired * 60 * 1000,
+      unlockedAt: elapsed >= benefit.timeRequired * 60 * 1000 ? new Date().toISOString() : undefined,
     }));
   };
 
@@ -446,21 +445,6 @@ export default function MainTab() {
         </View>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.content}>
-          
-          {/* Compteur des bienfaits santé */}
-          <View style={styles.objectivesContainer}>
-            <TouchableOpacity style={styles.objectiveCard} onPress={() => {
-              navigation.navigate('Analytics', { initialRoute: 'Santé' });
-            }}>
-              <Text style={styles.objectiveTitle}>🎯 Objectifs santé</Text>
-              <Text style={styles.objectiveSubtitle}>Suivez vos progrès</Text>
-              <View style={styles.objectiveProgress}>
-                <Text style={styles.objectiveProgressText}>
-                  {getCurrentHealthBenefits().filter(b => b.unlocked).length} / {getCurrentHealthBenefits().length} débloqués
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
           
           {/* Frise des 7 jours */}
           <View style={styles.sevenDaysContainer}>
@@ -1198,36 +1182,5 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 12,
     textAlign: 'center',
-  },
-  objectivesContainer: {
-    marginBottom: 20,
-  },
-  objectiveCard: {
-    backgroundColor: 'rgba(30, 41, 59, 0.8)',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(71, 85, 105, 0.3)',
-  },
-  objectiveTitle: {
-    color: '#F8FAFC',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  objectiveSubtitle: {
-    color: '#94A3B8',
-    fontSize: 12,
-    marginBottom: 8,
-  },
-  objectiveProgress: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  objectiveProgressText: {
-    color: '#10B981',
-    fontSize: 14,
-    fontWeight: '600',
   },
 });
