@@ -14,7 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
-import { profileStorage, dailyEntriesStorage, settingsStorage } from '../lib/storage';
+import { profileStorage, dailyEntriesStorage, settingsStorage, sessionStorage } from '../lib/storage';
 import { 
   calculateTheoreticalPlan, 
   getHealthBenefits, 
@@ -357,8 +357,14 @@ function HealthScreen() {
     const benefits = getHealthBenefits();
     setHealthBenefits(benefits);
     
-    // Simuler le temps écoulé (en réalité, récupérer depuis le session storage)
-    setSessionElapsed(2 * 24 * 60 * 60 * 1000); // 2 jours pour l'exemple
+    // Récupérer le temps écoulé depuis le session storage
+    try {
+      const sessionData = await sessionStorage.get();
+      setSessionElapsed(sessionData?.elapsedBeforePause || 0);
+    } catch (error) {
+      console.error('Erreur lors du chargement de la session:', error);
+      setSessionElapsed(0);
+    }
   };
 
   const updatedBenefits = updateUnlockedHealthBenefits(healthBenefits, sessionElapsed);
