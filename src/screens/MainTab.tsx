@@ -11,8 +11,6 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { sessionStorage, dailyEntriesStorage, streakStorage, profileStorage, settingsStorage } from '../lib/storage';
-import { testUserDataSync } from '../lib/testSync';
-import { testSupabaseConnection } from '../lib/testConnection';
 import { 
   formatTime, 
   getBallColor, 
@@ -194,6 +192,20 @@ export default function MainTab() {
     await sessionStorage.set(newSession);
   };
 
+  const handleStop = async () => {
+    const now = Date.now();
+    const elapsedTime = session.startTimestamp ? now - session.startTimestamp + session.elapsedBeforePause : session.elapsedBeforePause;
+    
+    const newSession: TimerSession = {
+      isRunning: false,
+      startTimestamp: null,
+      elapsedBeforePause: elapsedTime,
+    };
+    
+    setSession(newSession);
+    await sessionStorage.set(newSession);
+  };
+
   const handleRestart = async () => {
     Alert.alert(
       'Redémarrer',
@@ -332,29 +344,27 @@ export default function MainTab() {
   const getSevenDaysData = () => {
     const days = [];
     
-    // Trouver le premier jour (jour 1) - la première entrée dans dailyEntries
-    const sortedDates = Object.keys(dailyEntries).sort();
-    let firstDay: Date;
+    // Afficher les 6 derniers jours + aujourd'hui (7 jours au total)
+    // Commencer par il y a 6 jours et aller jusqu'à aujourd'hui
+    const today = new Date();
     
-    if (sortedDates.length === 0) {
-      // Si aucune entrée, considérer aujourd'hui comme le jour 1
-      firstDay = new Date();
-    } else {
-      firstDay = new Date(sortedDates[0]);
-    }
-    
-    // Toujours afficher 7 jours, en commençant par le jour 1
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(firstDay);
-      date.setDate(firstDay.getDate() + i);
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
       const dateString = date.toISOString().split('T')[0];
       const entry = dailyEntries[dateString];
       
-      // Calculer l'objectif pour ce jour (jour 1, 2, 3, etc.)
-      const dayNumberFromStart = i + 1;
-      const goalCigs = profile.objectiveType === 'complete' 
-        ? 0 
-        : getProgressiveGoal(profile, dayNumberFromStart - 1);
+      // Pour l'objectif, on peut utiliser l'objectif de l'entrée si elle existe,
+      // sinon calculer un objectif progressif basé sur le nombre de jours depuis le début
+      let goalCigs;
+      if (entry && entry.goalCigs !== undefined) {
+        goalCigs = entry.goalCigs;
+      } else {
+        // Calculer l'objectif progressif basé sur le profil
+        goalCigs = profile.objectiveType === 'complete' 
+          ? 0 
+          : getProgressiveGoal(profile, Object.keys(dailyEntries).length);
+      }
       
       days.push({
         date: dateString,
@@ -363,7 +373,7 @@ export default function MainTab() {
         entry,
         isToday: dateString === new Date().toISOString().split('T')[0],
         goalCigs,
-        dayNumberFromStart,
+        dayNumberFromStart: i === 0 ? 'Aujourd\'hui' : `Il y a ${i} jour${i > 1 ? 's' : ''}`,
       });
     }
     return days;
@@ -564,7 +574,7 @@ export default function MainTab() {
           <View style={styles.buttonsContainer}>
             <TouchableOpacity
               style={[styles.actionButton, styles.commitButton]}
-              onPress={handleStart}
+              onPress={session.startTimestamp ? handleStop : handleStart}
             >
               <Text style={styles.actionButtonIcon}>
                 {session.startTimestamp ? '✓' : '🚀'}
@@ -587,38 +597,6 @@ export default function MainTab() {
               <Text style={styles.actionButtonText}>Recommencer</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.moreButton, { opacity: 0.5 }]}
-              onPress={() => {
-                console.log('🚫 Test de connexion DÉSACTIVÉ pour éviter le spam');
-                Alert.alert('Désactivé', 'Test désactivé pour éviter le spam');
-              }}
-            >
-              <Text style={styles.actionButtonIcon}>🚫</Text>
-              <Text style={styles.actionButtonText}>Test OFF</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.moreButton, { backgroundColor: '#10B981', opacity: 0.5 }]}
-              onPress={() => {
-                console.log('🚫 Load DÉSACTIVÉ pour éviter le spam');
-                Alert.alert('Désactivé', 'Load désactivé pour éviter le spam');
-              }}
-            >
-              <Text style={styles.actionButtonIcon}>🚫</Text>
-              <Text style={styles.actionButtonText}>Load OFF</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.moreButton, { backgroundColor: '#F59E0B', opacity: 0.5 }]}
-              onPress={() => {
-                console.log('🚫 Sync DÉSACTIVÉ pour éviter le spam');
-                Alert.alert('Désactivé', 'Sync désactivé pour éviter le spam');
-              }}
-            >
-              <Text style={styles.actionButtonIcon}>🚫</Text>
-              <Text style={styles.actionButtonText}>Sync OFF</Text>
-            </TouchableOpacity>
           </View>
 
           {/* Graine évolutive */}

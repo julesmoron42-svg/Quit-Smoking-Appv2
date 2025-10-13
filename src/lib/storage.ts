@@ -251,11 +251,52 @@ export const settingsStorage = {
 
 export const sessionStorage = {
   async get(): Promise<TimerSession> {
-    return storage.get(STORAGE_KEYS.SESSION, DEFAULT_SESSION);
+    // D'abord essayer de charger depuis le stockage local
+    const localSession = await storage.get(STORAGE_KEYS.SESSION, DEFAULT_SESSION);
+    
+    // Si la session est par défaut, essayer de charger depuis Supabase
+    if (localSession.isRunning === DEFAULT_SESSION.isRunning && 
+        localSession.startTimestamp === DEFAULT_SESSION.startTimestamp &&
+        localSession.elapsedBeforePause === DEFAULT_SESSION.elapsedBeforePause) {
+      const userId = await getCurrentUserId();
+      if (userId) {
+        try {
+          const { DataSyncService } = await import('./dataSync');
+          const { data: remoteSession } = await DataSyncService.getTimerSession(userId);
+          if (remoteSession) {
+            console.log('📥 Session chrono chargée depuis Supabase:', remoteSession);
+            // Sauvegarder localement pour éviter de recharger à chaque fois
+            await storage.set(STORAGE_KEYS.SESSION, remoteSession);
+            return remoteSession;
+          }
+        } catch (error) {
+          console.log('⚠️ Impossible de charger la session depuis Supabase:', error);
+        }
+      }
+    }
+    
+    return localSession;
   },
 
   async set(session: TimerSession): Promise<void> {
-    return storage.set(STORAGE_KEYS.SESSION, session);
+    await storage.set(STORAGE_KEYS.SESSION, session);
+    
+    // Synchroniser avec Supabase
+    const userId = await getCurrentUserId();
+    if (userId) {
+      console.log('💾 Sauvegarde de la session chrono vers Supabase...', session);
+      try {
+        const { DataSyncService } = await import('./dataSync');
+        const result = await DataSyncService.syncTimerSession(userId, session);
+        if (result.error) {
+          console.error('❌ Erreur sauvegarde session chrono:', result.error);
+        } else {
+          console.log('✅ Session chrono sauvegardée dans Supabase');
+        }
+      } catch (error) {
+        console.error('❌ Erreur lors de la sauvegarde session chrono:', error);
+      }
+    }
   },
 
   // Fonction pour réinitialiser le chrono lors du changement d'utilisateur
@@ -480,13 +521,14 @@ export const loadAllDataFromSupabase = async (): Promise<void> => {
     
     // Charger toutes les données depuis Supabase
     const { DataSyncService } = await import('./dataSync');
-    const [profileResult, settingsResult, dailyEntriesResult, streakResult, goalsResult, achievementsResult] = await Promise.all([
+    const [profileResult, settingsResult, dailyEntriesResult, streakResult, goalsResult, achievementsResult, sessionResult] = await Promise.all([
       DataSyncService.getUserProfile(userId),
       DataSyncService.getSettings(userId),
       DataSyncService.getDailyEntries(userId),
       DataSyncService.getStreak(userId),
       DataSyncService.getFinancialGoals(userId),
       DataSyncService.getAchievements(userId),
+      DataSyncService.getTimerSession(userId),
     ]);
 
     // Log des résultats
@@ -497,6 +539,7 @@ export const loadAllDataFromSupabase = async (): Promise<void> => {
     console.log('  - Série:', streakResult.data ? '✅' : '❌', streakResult.error?.message || '');
     console.log('  - Objectifs:', goalsResult.data ? '✅' : '❌', goalsResult.error?.message || '');
     console.log('  - Réalisations:', achievementsResult.data ? '✅' : '❌', achievementsResult.error?.message || '');
+    console.log('  - Session chrono:', sessionResult.data ? '✅' : '❌', sessionResult.error?.message || '');
 
     // Sauvegarder les données récupérées localement
     await Promise.all([
@@ -506,6 +549,7 @@ export const loadAllDataFromSupabase = async (): Promise<void> => {
       streakResult.data ? storage.set(STORAGE_KEYS.STREAK, streakResult.data) : Promise.resolve(),
       goalsResult.data ? storage.set(STORAGE_KEYS.GOALS, goalsResult.data) : Promise.resolve(),
       achievementsResult.data ? storage.set(STORAGE_KEYS.ACHIEVEMENTS, achievementsResult.data) : Promise.resolve(),
+      sessionResult.data ? storage.set(STORAGE_KEYS.SESSION, sessionResult.data) : Promise.resolve(),
     ]);
 
     console.log('✅ Toutes les données chargées depuis Supabase vers le local');
@@ -532,13 +576,14 @@ export const forceReloadAllDataFromSupabase = async (): Promise<void> => {
     
     // Charger toutes les données depuis Supabase
     const { DataSyncService } = await import('./dataSync');
-    const [profileResult, settingsResult, dailyEntriesResult, streakResult, goalsResult, achievementsResult] = await Promise.all([
+    const [profileResult, settingsResult, dailyEntriesResult, streakResult, goalsResult, achievementsResult, sessionResult] = await Promise.all([
       DataSyncService.getUserProfile(userId),
       DataSyncService.getSettings(userId),
       DataSyncService.getDailyEntries(userId),
       DataSyncService.getStreak(userId),
       DataSyncService.getFinancialGoals(userId),
       DataSyncService.getAchievements(userId),
+      DataSyncService.getTimerSession(userId),
     ]);
 
     // Log des résultats
@@ -549,6 +594,7 @@ export const forceReloadAllDataFromSupabase = async (): Promise<void> => {
     console.log('  - Série:', streakResult.data ? '✅' : '❌', streakResult.error?.message || '');
     console.log('  - Objectifs:', goalsResult.data ? '✅' : '❌', goalsResult.error?.message || '');
     console.log('  - Réalisations:', achievementsResult.data ? '✅' : '❌', achievementsResult.error?.message || '');
+    console.log('  - Session chrono:', sessionResult.data ? '✅' : '❌', sessionResult.error?.message || '');
 
     // Forcer la sauvegarde locale de toutes les données récupérées
     await Promise.all([
@@ -558,6 +604,7 @@ export const forceReloadAllDataFromSupabase = async (): Promise<void> => {
       streakResult.data ? storage.set(STORAGE_KEYS.STREAK, streakResult.data) : Promise.resolve(),
       goalsResult.data ? storage.set(STORAGE_KEYS.GOALS, goalsResult.data) : Promise.resolve(),
       achievementsResult.data ? storage.set(STORAGE_KEYS.ACHIEVEMENTS, achievementsResult.data) : Promise.resolve(),
+      sessionResult.data ? storage.set(STORAGE_KEYS.SESSION, sessionResult.data) : Promise.resolve(),
     ]);
 
     console.log('✅ Rechargement forcé terminé - toutes les données sont maintenant synchronisées localement');

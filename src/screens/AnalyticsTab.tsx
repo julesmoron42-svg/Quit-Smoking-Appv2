@@ -14,15 +14,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
-import { profileStorage, dailyEntriesStorage, settingsStorage, sessionStorage } from '../lib/storage';
+import { profileStorage, dailyEntriesStorage, settingsStorage, sessionStorage, goalsStorage } from '../lib/storage';
 import { 
   calculateTheoreticalPlan, 
   getHealthBenefits, 
   updateUnlockedHealthBenefits,
   generateCigarettesChartData,
-  generateSavingsChartData
+  generateSavingsChartData,
+  calculateCigarettesAvoided,
+  calculateMoneySaved
 } from '../utils/calculations';
-import { UserProfile, DailyEntry, AppSettings, HealthBenefit } from '../types';
+import { UserProfile, DailyEntry, AppSettings, HealthBenefit, FinancialGoal } from '../types';
 
 const { width } = Dimensions.get('window');
 const Tab = createMaterialTopTabNavigator();
@@ -529,9 +531,116 @@ function HealthScreen() {
 
 // Écran Objectifs
 function GoalsScreen() {
-  const [goals, setGoals] = useState<any[]>([]);
+  const [goals, setGoals] = useState<FinancialGoal[]>([]);
   const [newGoalTitle, setNewGoalTitle] = useState('');
   const [newGoalPrice, setNewGoalPrice] = useState('');
+  const [profile, setProfile] = useState<UserProfile>({
+    startedSmokingYears: 0,
+    cigsPerDay: 20,
+    objectiveType: 'complete',
+    reductionFrequency: 1,
+  });
+  const [dailyEntries, setDailyEntries] = useState<Record<string, DailyEntry>>({});
+  const [settings, setSettings] = useState<AppSettings>({
+    pricePerCig: 0.6,
+    currency: '€',
+    notificationsAllowed: true,
+    language: 'fr',
+    animationsEnabled: true,
+  });
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [goalToDelete, setGoalToDelete] = useState<string | null>(null);
+
+  // Charger les données au montage du composant
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [goalsData, profileData, entriesData, settingsData] = await Promise.all([
+        goalsStorage.get(),
+        profileStorage.get(),
+        dailyEntriesStorage.get(),
+        settingsStorage.get()
+      ]);
+      
+      setGoals(goalsData);
+      setProfile(profileData);
+      setDailyEntries(entriesData);
+      setSettings(settingsData);
+    } catch (error) {
+      console.error('Erreur lors du chargement des données:', error);
+    }
+  };
+
+  // Calculer le total des économies en utilisant les mêmes fonctions que MainTab
+  const calculateTotalSavings = () => {
+    const cigarettesAvoided = calculateCigarettesAvoided(profile, dailyEntries, 0);
+    const totalSavings = calculateMoneySaved(cigarettesAvoided, settings.pricePerCig);
+    return totalSavings;
+  };
+
+  // Calculer le pourcentage de progression pour un objectif
+  const calculateProgressPercentage = (goalPrice: number, savings: number) => {
+    return Math.min(100, (savings / goalPrice) * 100);
+  };
+
+  const handleAddGoal = async () => {
+    if (!newGoalTitle.trim() || !newGoalPrice.trim()) {
+      alert('Veuillez remplir tous les champs');
+      return;
+    }
+
+    const price = parseFloat(newGoalPrice);
+    if (isNaN(price) || price <= 0) {
+      alert('Veuillez entrer un prix valide');
+      return;
+    }
+
+    const newGoal: FinancialGoal = {
+      id: Date.now().toString(),
+      title: newGoalTitle.trim(),
+      price: price,
+      createdAt: new Date().toISOString(),
+    };
+
+    try {
+      await goalsStorage.addGoal(newGoal);
+      setGoals([...goals, newGoal]);
+      setNewGoalTitle('');
+      setNewGoalPrice('');
+    } catch (error) {
+      console.error('Erreur lors de l\'ajout de l\'objectif:', error);
+      alert('Erreur lors de l\'ajout de l\'objectif');
+    }
+  };
+
+  const handleDeleteGoal = (goalId: string) => {
+    setGoalToDelete(goalId);
+    setShowDeleteConfirmation(true);
+  };
+
+  const confirmDeleteGoal = async () => {
+    if (!goalToDelete) return;
+    
+    try {
+      await goalsStorage.removeGoal(goalToDelete);
+      setGoals(goals.filter(goal => goal.id !== goalToDelete));
+      setShowDeleteConfirmation(false);
+      setGoalToDelete(null);
+    } catch (error) {
+      console.error('Erreur lors de la suppression de l\'objectif:', error);
+      alert('Erreur lors de la suppression de l\'objectif');
+    }
+  };
+
+  const cancelDeleteGoal = () => {
+    setShowDeleteConfirmation(false);
+    setGoalToDelete(null);
+  };
+
+  const totalSavings = calculateTotalSavings();
 
   return (
     <View style={styles.container}>
@@ -573,6 +682,12 @@ function GoalsScreen() {
         <Text style={styles.screenDescription}>
           Définissez des objectifs d'achat pour rester motivé
         </Text>
+
+        {/* Affichage du total des économies */}
+        <View style={styles.savingsSummary}>
+          <Text style={styles.savingsTitle}>💰 Total économisé</Text>
+          <Text style={styles.savingsAmount}>{totalSavings.toFixed(2)}{settings.currency}</Text>
+        </View>
         
         <View style={styles.goalForm}>
           <Text style={styles.formLabel}>Nouvel objectif</Text>
@@ -591,7 +706,11 @@ function GoalsScreen() {
             keyboardType="numeric"
             placeholderTextColor="#64748B"
           />
-          <TouchableOpacity style={styles.addButton}>
+          <TouchableOpacity 
+            style={[styles.addButton, (!newGoalTitle.trim() || !newGoalPrice.trim()) && styles.addButtonDisabled]}
+            onPress={handleAddGoal}
+            disabled={!newGoalTitle.trim() || !newGoalPrice.trim()}
+          >
             <Text style={styles.addButtonText}>➕ Ajouter l'objectif</Text>
           </TouchableOpacity>
         </View>
@@ -606,19 +725,75 @@ function GoalsScreen() {
             </Text>
           </View>
         ) : (
-          goals.map((goal) => (
-            <View key={goal.id} style={styles.goalCard}>
-              <Text style={styles.goalTitle}>{goal.title}</Text>
-              <Text style={styles.goalPrice}>{goal.price}€</Text>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: '0%' }]} />
+          goals.map((goal) => {
+            const progressPercentage = calculateProgressPercentage(goal.price, totalSavings);
+            const remainingAmount = Math.max(0, goal.price - totalSavings);
+            const isCompleted = totalSavings >= goal.price;
+            
+            return (
+              <View key={goal.id} style={[styles.goalCard, isCompleted && styles.goalCardCompleted]}>
+                <View style={styles.goalHeader}>
+                  <Text style={[styles.goalTitle, isCompleted && styles.goalTitleCompleted]}>{goal.title}</Text>
+                  <TouchableOpacity 
+                    style={styles.deleteButton}
+                    onPress={() => handleDeleteGoal(goal.id)}
+                  >
+                    <Text style={styles.deleteButtonText}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.goalPrice, isCompleted && styles.goalPriceCompleted]}>{goal.price}{settings.currency}</Text>
+                <View style={styles.progressBar}>
+                  <View style={[styles.progressFill, { width: `${Math.min(100, progressPercentage)}%` }]} />
+                </View>
+                <Text style={[styles.progressText, isCompleted && styles.progressTextCompleted]}>
+                  {isCompleted ? (
+                    <>🎉 Objectif atteint ! ({totalSavings.toFixed(2)}{settings.currency} économisé)</>
+                  ) : (
+                    <>{progressPercentage.toFixed(1)}% - {totalSavings.toFixed(2)}{settings.currency} économisé sur {goal.price}{settings.currency}</>
+                  )}
+                </Text>
+                {!isCompleted && (
+                  <Text style={styles.remainingText}>
+                    Il reste {remainingAmount.toFixed(2)}{settings.currency} à économiser
+                  </Text>
+                )}
               </View>
-              <Text style={styles.progressText}>0% - 0€ économisé</Text>
-            </View>
-          ))
+            );
+          })
         )}
         </ScrollView>
       </LinearGradient>
+
+      {/* Modal de confirmation de suppression */}
+      <Modal
+        visible={showDeleteConfirmation}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={cancelDeleteGoal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.deleteConfirmationContainer}>
+            <Text style={styles.deleteConfirmationTitle}>🗑️ Supprimer l'objectif</Text>
+            <Text style={styles.deleteConfirmationMessage}>
+              Êtes-vous sûr de vouloir supprimer cet objectif ? Cette action est irréversible.
+            </Text>
+            <View style={styles.deleteConfirmationButtons}>
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={cancelDeleteGoal}
+              >
+                <Text style={styles.cancelButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.confirmDeleteButton}
+                onPress={confirmDeleteGoal}
+              >
+                <Text style={styles.confirmDeleteButtonText}>Supprimer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1115,5 +1290,204 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 4,
     elevation: 4,
+  },
+  // Styles pour les objectifs financiers
+  savingsSummary: {
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.3)',
+    alignItems: 'center',
+  },
+  savingsTitle: {
+    color: '#22C55E',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  savingsAmount: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  goalForm: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  formLabel: {
+    color: '#F8FAFC',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  textInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    color: '#FFFFFF',
+    fontSize: 16,
+  },
+  addButton: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 8,
+    padding: 14,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  addButtonDisabled: {
+    backgroundColor: 'rgba(59, 130, 246, 0.3)',
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  goalCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  goalCardCompleted: {
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    borderColor: 'rgba(34, 197, 94, 0.3)',
+  },
+  goalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  goalTitle: {
+    color: '#F8FAFC',
+    fontSize: 18,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  goalTitleCompleted: {
+    color: '#22C55E',
+  },
+  goalPrice: {
+    color: '#3B82F6',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  goalPriceCompleted: {
+    color: '#22C55E',
+  },
+  progressBar: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 4,
+    height: 8,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    backgroundColor: '#3B82F6',
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressText: {
+    color: '#94A3B8',
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  progressTextCompleted: {
+    color: '#22C55E',
+    fontWeight: '600',
+  },
+  remainingText: {
+    color: '#64748B',
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  deleteButton: {
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+    minWidth: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButtonText: {
+    fontSize: 18,
+    color: '#EF4444',
+  },
+  // Styles pour l'overlay de confirmation de suppression
+  deleteConfirmationContainer: {
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    borderRadius: 16,
+    padding: 24,
+    marginHorizontal: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    minWidth: 280,
+    maxWidth: 320,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  deleteConfirmationTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#EF4444',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  deleteConfirmationMessage: {
+    fontSize: 16,
+    color: '#E2E8F0',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  deleteConfirmationButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: 'rgba(71, 85, 105, 0.3)',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(71, 85, 105, 0.5)',
+  },
+  cancelButtonText: {
+    color: '#94A3B8',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  confirmDeleteButton: {
+    flex: 1,
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+  },
+  confirmDeleteButtonText: {
+    color: '#EF4444',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

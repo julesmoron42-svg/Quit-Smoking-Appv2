@@ -457,6 +457,64 @@ export class DataSyncService {
     }
   }
 
+  // Synchroniser la session du chrono
+  static async syncTimerSession(userId: string, session: TimerSession) {
+    try {
+      const { data, error } = await supabase
+        .from('user_timer_sessions')
+        .upsert({
+          user_id: userId, // userId est maintenant l'email
+          is_running: session.isRunning,
+          start_timestamp: session.startTimestamp,
+          elapsed_before_pause: session.elapsedBeforePause,
+          updated_at: new Date().toISOString(),
+        }, { 
+          onConflict: 'user_id' // Spécifier la colonne de conflit
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation de la session:', error);
+      return { data: null, error };
+    }
+  }
+
+  // Récupérer la session du chrono
+  static async getTimerSession(userId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('user_timer_sessions')
+        .select('*')
+        .eq('user_id', userId) // userId est maintenant l'email
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Erreur détaillée session chrono:', error);
+        throw error;
+      }
+      
+      // Convertir les noms de colonnes de snake_case vers camelCase
+      const session: TimerSession = data ? {
+        isRunning: data.is_running,
+        startTimestamp: data.start_timestamp,
+        elapsedBeforePause: data.elapsed_before_pause,
+      } : {
+        isRunning: false,
+        startTimestamp: null,
+        elapsedBeforePause: 0,
+      };
+      
+      console.log('Session chrono récupérée:', { data, session, error });
+      return { data: session, error: null };
+    } catch (error) {
+      console.error('Erreur lors de la récupération de la session:', error);
+      return { data: null, error };
+    }
+  }
+
   // Synchroniser toutes les données utilisateur
   static async syncAllUserData(userId: string, appData: {
     profile: UserProfile;
@@ -465,6 +523,7 @@ export class DataSyncService {
     goals: FinancialGoal[];
     achievements: Achievement[];
     streak: StreakData;
+    session: TimerSession;
   }) {
     try {
       await Promise.all([
@@ -474,6 +533,7 @@ export class DataSyncService {
         this.syncFinancialGoals(userId, appData.goals),
         this.syncAchievements(userId, appData.achievements),
         this.syncStreak(userId, appData.streak),
+        this.syncTimerSession(userId, appData.session),
       ]);
 
       return { success: true, error: null };
