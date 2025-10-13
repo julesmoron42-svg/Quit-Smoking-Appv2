@@ -68,12 +68,18 @@ export default function MainTab() {
   // Vérifier si l'onboarding est nécessaire
   useEffect(() => {
     // Vérifier seulement après que les données ont été chargées
-    if (profile && profile.onboardingCompleted === false) {
+    // L'onboarding ne doit s'afficher que si :
+    // 1. Le profil existe
+    // 2. onboardingCompleted est explicitement false (pas undefined)
+    // 3. Il n'y a pas encore d'entrées quotidiennes (première connexion)
+    if (profile && 
+        profile.onboardingCompleted === false && 
+        Object.keys(dailyEntries).length === 0) {
       setOnboardingVisible(true);
-    } else if (profile && profile.onboardingCompleted === true) {
+    } else {
       setOnboardingVisible(false);
     }
-  }, [profile.onboardingCompleted]);
+  }, [profile.onboardingCompleted, dailyEntries]);
 
   // Pas de reset automatique du streak au chargement
   // Le streak est géré uniquement lors de la saisie des entrées quotidiennes
@@ -143,6 +149,7 @@ export default function MainTab() {
         }
         setProfile(profileData);
       } else {
+        // Nouveau profil - onboarding nécessaire
         setProfile(defaultProfile);
       }
 

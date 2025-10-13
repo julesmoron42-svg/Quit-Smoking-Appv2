@@ -13,7 +13,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { LineChart } from 'react-native-chart-kit';
+import Svg, { Line, Polyline, Text as SvgText, G, Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 import { profileStorage, dailyEntriesStorage, settingsStorage, sessionStorage, goalsStorage } from '../lib/storage';
 import { 
   calculateTheoreticalPlan, 
@@ -29,9 +29,183 @@ import { UserProfile, DailyEntry, AppSettings, HealthBenefit, FinancialGoal } fr
 const { width } = Dimensions.get('window');
 const Tab = createMaterialTopTabNavigator();
 
+// Fonction pour créer un graphique SVG simple
+const createSimpleChart = (data: any, width: number, height: number, period: string = '1M') => {
+  const chartWidth = width - 40;
+  const chartHeight = height - 40;
+  const paddingLeft = 40;
+  const paddingRight = 20;
+  const paddingTop = 20;
+  const paddingBottom = 20;
+  
+  // Vérifier que les données existent
+  if (!data || !data.datasets || data.datasets.length === 0) {
+    return (
+      <Svg width={chartWidth} height={chartHeight}>
+        <SvgText x={chartWidth/2} y={chartHeight/2} textAnchor="middle" fill="#94A3B8" fontSize="14">
+          Aucune donnée disponible
+        </SvgText>
+      </Svg>
+    );
+  }
+  
+  // Trouver les valeurs min et max avec vérification
+  const allValues = data.datasets.flatMap((dataset: any) => 
+    dataset.data ? dataset.data.filter((val: any) => typeof val === 'number' && !isNaN(val)) : []
+  );
+  
+  if (allValues.length === 0) {
+    return (
+      <Svg width={chartWidth} height={chartHeight}>
+        <SvgText x={chartWidth/2} y={chartHeight/2} textAnchor="middle" fill="#94A3B8" fontSize="14">
+          Aucune donnée valide
+        </SvgText>
+      </Svg>
+    );
+  }
+  
+  const minValue = Math.min(...allValues);
+  const maxValue = Math.max(...allValues);
+  const range = maxValue - minValue || 1;
+  
+  // Fonction pour convertir les données en coordonnées SVG
+  const getCoordinates = (dataset: any, color: string) => {
+    if (!dataset.data || dataset.data.length === 0) {
+      return { points: '', color };
+    }
+    
+    const points = dataset.data
+      .filter((value: any) => typeof value === 'number' && !isNaN(value))
+      .map((value: number, index: number) => {
+        const x = paddingLeft + (index / Math.max(dataset.data.length - 1, 1)) * (chartWidth - paddingLeft - paddingRight);
+        const y = paddingTop + ((maxValue - value) / range) * (chartHeight - paddingTop - paddingBottom);
+        return `${x},${y}`;
+      }).join(' ');
+    return { points, color };
+  };
+  
+  // Créer les lignes pour chaque dataset
+  const lines = data.datasets
+    .filter((dataset: any) => dataset.data && dataset.data.length > 0)
+    .map((dataset: any, index: number) => {
+      const color = index === 0 ? '#3B82F6' : '#10B981';
+      const coords = getCoordinates(dataset, color);
+      const strokeDasharray = index === 0 ? '5,5' : '0';
+      
+      // Ne pas afficher la ligne si pas de points valides
+      if (!coords.points || coords.points.trim() === '') {
+        return null;
+      }
+      
+      return (
+        <Polyline
+          key={index}
+          points={coords.points}
+          fill="none"
+          stroke={coords.color}
+          strokeWidth={index === 0 ? 2 : 3}
+          strokeDasharray={strokeDasharray}
+        />
+      );
+    })
+    .filter(Boolean); // Supprimer les éléments null
+  
+  // Créer les axes et labels (sans grille)
+  const axisLabels = [];
+  
+  // Labels des valeurs Y (axe vertical)
+  for (let i = 0; i <= 4; i++) {
+    const y = paddingTop + (i / 4) * (chartHeight - paddingTop - paddingBottom);
+    const value = maxValue - (i / 4) * range;
+    
+    axisLabels.push(
+      <SvgText
+        key={`label-y-${i}`}
+        x={paddingLeft - 10}
+        y={y + 4}
+        textAnchor="end"
+        fill="#94A3B8"
+        fontSize="10"
+      >
+        {Math.round(value)}
+      </SvgText>
+    );
+  }
+  
+  // Labels des dates (axe horizontal)
+  if (data.datasets[0] && data.datasets[0].data) {
+    const dataLength = data.datasets[0].data.length;
+    const today = new Date();
+    
+    for (let i = 0; i < dataLength; i++) {
+      const x = paddingLeft + (i / Math.max(dataLength - 1, 1)) * (chartWidth - paddingLeft - paddingRight);
+      
+      // Afficher les dates (tous les 5 points pour éviter la surcharge)
+      if (i % Math.max(Math.floor(dataLength / 5), 1) === 0) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - (dataLength - 1 - i));
+        const day = date.getDate();
+        const month = date.getMonth() + 1;
+        
+        axisLabels.push(
+          <SvgText
+            key={`label-x-${i}`}
+            x={x}
+            y={chartHeight - paddingBottom + 15}
+            textAnchor="middle"
+            fill="#94A3B8"
+            fontSize="9"
+          >
+            {`${day}/${month}`}
+          </SvgText>
+        );
+      }
+    }
+  }
+  
+  // Axes principaux
+  const axes = [
+    // Axe Y (vertical)
+    <Line
+      key="axis-y"
+      x1={paddingLeft}
+      y1={paddingTop}
+      x2={paddingLeft}
+      y2={chartHeight - paddingBottom}
+      stroke="#64748B"
+      strokeWidth="2"
+    />,
+    // Axe X (horizontal)
+    <Line
+      key="axis-x"
+      x1={paddingLeft}
+      y1={chartHeight - paddingBottom}
+      x2={chartWidth - paddingRight}
+      y2={chartHeight - paddingBottom}
+      stroke="#64748B"
+      strokeWidth="2"
+    />
+  ];
+  
+  return (
+    <Svg width={chartWidth} height={chartHeight}>
+      <Defs>
+        <SvgLinearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <Stop offset="0%" stopColor="rgba(59, 130, 246, 0.1)" />
+          <Stop offset="100%" stopColor="rgba(59, 130, 246, 0.05)" />
+        </SvgLinearGradient>
+      </Defs>
+      {axes}
+      {lines}
+      {axisLabels}
+    </Svg>
+  );
+};
+
 // Écran Cigarettes avec graphique
 function CigarettesScreen() {
   const navigation = useNavigation();
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('1M');
   const [profile, setProfile] = useState<UserProfile>({
     startedSmokingYears: 0,
     cigsPerDay: 20,
@@ -63,36 +237,45 @@ function CigarettesScreen() {
 
 
 
-  const chartData = generateCigarettesChartData(profile, dailyEntries, 30);
-
-  const chartConfig = {
-    backgroundColor: 'rgba(7, 16, 51, 0.8)',
-    backgroundGradientFrom: 'rgba(7, 16, 51, 0.8)',
-    backgroundGradientTo: 'rgba(7, 16, 51, 0.8)',
-    decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(148, 163, 184, ${opacity})`,
-    style: {
-      borderRadius: 16,
-    },
-    propsForDots: {
-      r: '8', // Points invisibles mais cliquables
-      strokeWidth: '0',
-      stroke: 'transparent',
-      fill: 'transparent',
-    },
-    propsForLabels: {
-      fontSize: 10,
-    },
-    propsForVerticalLabels: {
-      fontSize: 10,
-      dx: -10, // Décalage à gauche
-    },
-    propsForHorizontalLabels: {
-      fontSize: 10,
-      dy: 5,
-    },
+  // Calculer le nombre de jours selon la période
+  const getDaysForPeriod = (period: string): number => {
+    switch (period) {
+      case '1M': return 30;
+      case '6M': return 180;
+      case '1Y': return 365;
+      case '10Y': return 3650;
+      default: return 30;
+    }
   };
+
+  // Fonction pour lisser les données avec une moyenne mobile
+  const smoothData = (data: number[], windowSize: number = 7): number[] => {
+    if (data.length <= windowSize) return data;
+    
+    const smoothed = [];
+    for (let i = 0; i < data.length; i++) {
+      const start = Math.max(0, i - Math.floor(windowSize / 2));
+      const end = Math.min(data.length, start + windowSize);
+      const window = data.slice(start, end);
+      const average = window.reduce((sum, val) => sum + val, 0) / window.length;
+      smoothed.push(average);
+    }
+    return smoothed;
+  };
+
+  const rawChartData = generateCigarettesChartData(profile, dailyEntries, getDaysForPeriod(selectedPeriod));
+  
+  // Appliquer le lissage pour les périodes longues
+  let chartData = rawChartData;
+  if (selectedPeriod !== '1M' && rawChartData.datasets) {
+    chartData = {
+      ...rawChartData,
+      datasets: rawChartData.datasets.map((dataset: any) => ({
+        ...dataset,
+        data: smoothData(dataset.data, selectedPeriod === '6M' ? 7 : selectedPeriod === '1Y' ? 14 : 30)
+      }))
+    };
+  }
 
   return (
     <View style={styles.container}>
@@ -132,38 +315,53 @@ function CigarettesScreen() {
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <Text style={styles.screenTitle}>📊 Cigarettes</Text>
           <Text style={styles.screenDescription}>
-            Évolution de votre consommation sur 30 jours
+            Évolution de votre consommation
           </Text>
+          
+          {/* Sélecteur de période */}
+          <View style={styles.periodSelector}>
+            {['1M', '6M', '1Y', '10Y'].map((period) => (
+              <TouchableOpacity
+                key={period}
+                style={[
+                  styles.periodButton,
+                  selectedPeriod === period && styles.periodButtonActive
+                ]}
+                onPress={() => setSelectedPeriod(period)}
+              >
+                <Text style={[
+                  styles.periodButtonText,
+                  selectedPeriod === period && styles.periodButtonTextActive
+                ]}>
+                  {period}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           
           {/* Graphique */}
           <View style={styles.chartWrapper}>
-            <LineChart
-              data={chartData}
-              width={width - 40}
-              height={220}
-              chartConfig={chartConfig}
-              bezier
-              style={styles.chart}
-              withInnerLines={true}
-              withOuterLines={true}
-              withVerticalLines={false}
-              withHorizontalLines={true}
-              segments={4}
-              yAxisSuffix=""
-              yAxisInterval={1}
-              paddingLeft={20}
-              paddingRight={5}
-            />
+            {createSimpleChart(chartData, width, 300)}
           </View>
             
             {/* Légende */}
             <View style={styles.legend}>
               <View style={styles.legendItem}>
-                <View style={[styles.legendLine, { borderStyle: 'dashed', borderColor: '#3B82F6' }]} />
+                <Svg width={20} height={3}>
+                  <Line
+                    x1={0}
+                    y1={1.5}
+                    x2={20}
+                    y2={1.5}
+                    stroke="#3B82F6"
+                    strokeWidth={2}
+                    strokeDasharray="3,3"
+                  />
+                </Svg>
                 <Text style={styles.legendText}>Projection théorique</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendLine, { backgroundColor: '#10B981' }]} />
+                <View style={[styles.legendLine, { backgroundColor: '#10B981', borderWidth: 0 }]} />
                 <Text style={styles.legendText}>Consommation réelle</Text>
               </View>
             </View>
@@ -178,6 +376,7 @@ function CigarettesScreen() {
 // Écran Économies avec graphique cumulatif
 function SavingsScreen() {
   const navigation = useNavigation();
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('1M');
   const [profile, setProfile] = useState<UserProfile>({
     startedSmokingYears: 0,
     cigsPerDay: 20,
@@ -229,25 +428,46 @@ function SavingsScreen() {
     return totalSavings;
   };
 
-  const chartData = generateSavingsChartData(profile, dailyEntries, settings.pricePerCig, 30);
-
-  const chartConfig = {
-    backgroundColor: 'rgba(7, 16, 51, 0.8)',
-    backgroundGradientFrom: 'rgba(7, 16, 51, 0.8)',
-    backgroundGradientTo: 'rgba(7, 16, 51, 0.8)',
-    decimalPlaces: 1,
-    color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(148, 163, 184, ${opacity})`,
-    style: {
-      borderRadius: 16,
-    },
-    propsForDots: {
-      r: '0', // Pas de points
-    },
-    propsForLabels: {
-      fontSize: 10,
-    },
+  // Calculer le nombre de jours selon la période
+  const getDaysForPeriod = (period: string): number => {
+    switch (period) {
+      case '1M': return 30;
+      case '6M': return 180;
+      case '1Y': return 365;
+      case '10Y': return 3650;
+      default: return 30;
+    }
   };
+
+  // Fonction pour lisser les données avec une moyenne mobile
+  const smoothData = (data: number[], windowSize: number = 7): number[] => {
+    if (data.length <= windowSize) return data;
+    
+    const smoothed = [];
+    for (let i = 0; i < data.length; i++) {
+      const start = Math.max(0, i - Math.floor(windowSize / 2));
+      const end = Math.min(data.length, start + windowSize);
+      const window = data.slice(start, end);
+      const average = window.reduce((sum, val) => sum + val, 0) / window.length;
+      smoothed.push(average);
+    }
+    return smoothed;
+  };
+
+  const rawChartData = generateSavingsChartData(profile, dailyEntries, settings.pricePerCig, getDaysForPeriod(selectedPeriod));
+  
+  // Appliquer le lissage pour les périodes longues
+  let chartData = rawChartData;
+  if (selectedPeriod !== '1M' && rawChartData.datasets) {
+    chartData = {
+      ...rawChartData,
+      datasets: rawChartData.datasets.map((dataset: any) => ({
+        ...dataset,
+        data: smoothData(dataset.data, selectedPeriod === '6M' ? 7 : selectedPeriod === '1Y' ? 14 : 30)
+      }))
+    };
+  }
+
 
   return (
     <View style={styles.container}>
@@ -287,33 +507,52 @@ function SavingsScreen() {
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <Text style={styles.screenTitle}>💰 Économies</Text>
           <Text style={styles.screenDescription}>
-            Évolution cumulative de vos économies sur 30 jours
+            Évolution cumulative de vos économies
           </Text>
+          
+          {/* Sélecteur de période */}
+          <View style={styles.periodSelector}>
+            {['1M', '6M', '1Y', '10Y'].map((period) => (
+              <TouchableOpacity
+                key={period}
+                style={[
+                  styles.periodButton,
+                  selectedPeriod === period && styles.periodButtonActive
+                ]}
+                onPress={() => setSelectedPeriod(period)}
+              >
+                <Text style={[
+                  styles.periodButtonText,
+                  selectedPeriod === period && styles.periodButtonTextActive
+                ]}>
+                  {period}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           
           {/* Graphique */}
           <View style={styles.chartWrapper}>
-            <LineChart
-              data={chartData}
-              width={width - 40}
-              height={220}
-              chartConfig={chartConfig}
-              bezier
-              style={styles.chart}
-              withInnerLines={true}
-              withOuterLines={true}
-              withVerticalLines={false}
-              withHorizontalLines={true}
-              segments={4}
-            />
+            {createSimpleChart(chartData, width, 300)}
             
             {/* Légende */}
             <View style={styles.legend}>
               <View style={styles.legendItem}>
-                <View style={[styles.legendLine, { borderStyle: 'dashed', borderColor: '#3B82F6' }]} />
+                <Svg width={20} height={3}>
+                  <Line
+                    x1={0}
+                    y1={1.5}
+                    x2={20}
+                    y2={1.5}
+                    stroke="#3B82F6"
+                    strokeWidth={2}
+                    strokeDasharray="3,3"
+                  />
+                </Svg>
                 <Text style={styles.legendText}>Économies théoriques</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendLine, { backgroundColor: '#10B981' }]} />
+                <View style={[styles.legendLine, { backgroundColor: '#10B981', borderWidth: 0 }]} />
                 <Text style={styles.legendText}>Économies réelles</Text>
               </View>
             </View>
@@ -883,6 +1122,33 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
   },
+  periodSelector: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 20,
+    gap: 10,
+  },
+  periodButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  periodButtonActive: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
+  },
+  periodButtonText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  periodButtonTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
   dataContainer: {
     marginBottom: 20,
   },
@@ -1157,10 +1423,11 @@ const styles = StyleSheet.create({
   chartWrapper: {
     alignItems: 'center',
     marginBottom: 20,
-  },
-  chart: {
-    marginVertical: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 16,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   legend: {
     flexDirection: 'row',
@@ -1175,8 +1442,9 @@ const styles = StyleSheet.create({
   },
   legendLine: {
     width: 20,
-    height: 2,
+    height: 3,
     borderRadius: 1,
+    borderWidth: 2,
   },
   legendText: {
     color: '#94A3B8',
