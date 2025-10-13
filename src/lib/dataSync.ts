@@ -8,8 +8,20 @@ export class DataSyncService {
       const { data, error } = await supabase
         .from('user_profiles')
         .upsert({
-          id: userId,
-          ...profile,
+          id: userId, // userId est maintenant l'email
+          started_smoking_years: profile.startedSmokingYears,
+          cigs_per_day: profile.cigsPerDay,
+          objective_type: profile.objectiveType,
+          reduction_frequency: profile.reductionFrequency,
+          smoking_years: profile.smokingYears,
+          smoking_peak_time: profile.smokingPeakTime,
+          main_goal: profile.mainGoal,
+          target_date: profile.targetDate,
+          main_motivation: profile.mainMotivation,
+          previous_attempts: profile.previousAttempts,
+          smoking_triggers: profile.smokingTriggers,
+          smoking_situations: profile.smokingSituations,
+          onboarding_completed: profile.onboardingCompleted,
           updated_at: new Date().toISOString(),
         })
         .select()
@@ -29,11 +41,32 @@ export class DataSyncService {
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('id', userId)
+        .eq('id', userId) // userId est maintenant l'email
         .single();
 
       if (error && error.code !== 'PGRST116') throw error; // PGRST116 = pas de données
-      return { data, error: null };
+      
+      // Convertir les noms de colonnes de snake_case vers camelCase
+      const profile: UserProfile = data ? {
+        id: data.id, // L'ID est maintenant l'email
+        startedSmokingYears: data.started_smoking_years,
+        cigsPerDay: data.cigs_per_day,
+        objectiveType: data.objective_type,
+        reductionFrequency: data.reduction_frequency,
+        smokingYears: data.smoking_years,
+        smokingPeakTime: data.smoking_peak_time,
+        mainGoal: data.main_goal,
+        targetDate: data.target_date,
+        mainMotivation: data.main_motivation,
+        previousAttempts: data.previous_attempts,
+        smokingTriggers: data.smoking_triggers,
+        smokingSituations: data.smoking_situations,
+        onboardingCompleted: data.onboarding_completed,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      } : null;
+      
+      return { data: profile, error: null };
     } catch (error) {
       console.error('Erreur lors de la récupération du profil:', error);
       return { data: null, error };
@@ -43,18 +76,51 @@ export class DataSyncService {
   // Synchroniser les paramètres
   static async syncSettings(userId: string, settings: AppSettings) {
     try {
-      const { data, error } = await supabase
+      // D'abord, essayer de récupérer l'enregistrement existant
+      const { data: existingData } = await supabase
         .from('user_settings')
-        .upsert({
-          user_id: userId,
-          ...settings,
-          updated_at: new Date().toISOString(),
-        })
-        .select()
+        .select('*')
+        .eq('user_id', userId) // userId est maintenant l'email // userId est maintenant l'email
         .single();
 
-      if (error) throw error;
-      return { data, error: null };
+      if (existingData) {
+        // Mettre à jour l'enregistrement existant
+        const { data, error } = await supabase
+          .from('user_settings')
+          .update({
+            price_per_cig: settings.pricePerCig,
+            currency: settings.currency,
+            notifications_allowed: settings.notificationsAllowed,
+            language: settings.language,
+            animations_enabled: settings.animationsEnabled,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', userId) // userId est maintenant l'email // userId est maintenant l'email
+          .select()
+          .single();
+
+        if (error) throw error;
+        return { data, error: null };
+      } else {
+        // Créer un nouvel enregistrement
+        const { data, error } = await supabase
+          .from('user_settings')
+          .insert({
+            user_id: userId, // userId est maintenant l'email
+            price_per_cig: settings.pricePerCig,
+            currency: settings.currency,
+            notifications_allowed: settings.notificationsAllowed,
+            language: settings.language,
+            animations_enabled: settings.animationsEnabled,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return { data, error: null };
+      }
     } catch (error) {
       console.error('Erreur lors de la synchronisation des paramètres:', error);
       return { data: null, error };
@@ -67,11 +133,25 @@ export class DataSyncService {
       const { data, error } = await supabase
         .from('user_settings')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', userId) // userId est maintenant l'email
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
-      return { data, error: null };
+      if (error && error.code !== 'PGRST116') {
+        console.error('Erreur détaillée paramètres:', error);
+        throw error;
+      }
+      
+      // Convertir les noms de colonnes de snake_case vers camelCase
+      const settings: AppSettings = data ? {
+        pricePerCig: data.price_per_cig,
+        currency: data.currency,
+        notificationsAllowed: data.notifications_allowed,
+        language: data.language,
+        animationsEnabled: data.animations_enabled,
+      } : null;
+      
+      console.log('Paramètres récupérés:', { data, settings, error });
+      return { data: settings, error: null };
     } catch (error) {
       console.error('Erreur lors de la récupération des paramètres:', error);
       return { data: null, error };
@@ -82,9 +162,12 @@ export class DataSyncService {
   static async syncDailyEntries(userId: string, entries: Record<string, DailyEntry>) {
     try {
       const entriesArray = Object.entries(entries).map(([date, entry]) => ({
-        user_id: userId,
+        user_id: userId, // userId est maintenant l'email
         date,
-        ...entry,
+        real_cigs: entry.realCigs,
+        goal_cigs: entry.goalCigs,
+        emotion: entry.emotion,
+        objective_met: entry.objectiveMet,
         updated_at: new Date().toISOString(),
       }));
 
@@ -107,7 +190,7 @@ export class DataSyncService {
       const { data, error } = await supabase
         .from('daily_entries')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', userId) // userId est maintenant l'email
         .order('date', { ascending: false });
 
       if (error) throw error;
@@ -115,8 +198,13 @@ export class DataSyncService {
       // Convertir en format Record<string, DailyEntry>
       const entries: Record<string, DailyEntry> = {};
       data?.forEach((entry: any) => {
-        const { user_id, date, updated_at, ...entryData } = entry;
-        entries[date] = entryData;
+        entries[entry.date] = {
+          realCigs: entry.real_cigs,
+          goalCigs: entry.goal_cigs,
+          date: entry.date,
+          emotion: entry.emotion,
+          objectiveMet: entry.objective_met,
+        };
       });
 
       return { data: entries, error: null };
@@ -130,8 +218,12 @@ export class DataSyncService {
   static async syncFinancialGoals(userId: string, goals: FinancialGoal[]) {
     try {
       const goalsWithUserId = goals.map(goal => ({
-        ...goal,
-        user_id: userId,
+        id: goal.id,
+        user_id: userId, // userId est maintenant l'email
+        title: goal.title,
+        price: goal.price,
+        target_date: goal.targetDate,
+        created_at: goal.createdAt,
         updated_at: new Date().toISOString(),
       }));
 
@@ -154,11 +246,21 @@ export class DataSyncService {
       const { data, error } = await supabase
         .from('financial_goals')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', userId) // userId est maintenant l'email
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return { data, error: null };
+      
+      // Convertir les noms de colonnes de snake_case vers camelCase
+      const goals: FinancialGoal[] = data?.map((goal: any) => ({
+        id: goal.id,
+        title: goal.title,
+        price: goal.price,
+        createdAt: goal.created_at,
+        targetDate: goal.target_date,
+      })) || [];
+      
+      return { data: goals, error: null };
     } catch (error) {
       console.error('Erreur lors de la récupération des objectifs:', error);
       return { data: null, error };
@@ -169,8 +271,12 @@ export class DataSyncService {
   static async syncAchievements(userId: string, achievements: Achievement[]) {
     try {
       const achievementsWithUserId = achievements.map(achievement => ({
-        ...achievement,
-        user_id: userId,
+        id: achievement.id,
+        user_id: userId, // userId est maintenant l'email
+        title: achievement.title,
+        description: achievement.description,
+        icon: achievement.icon,
+        unlocked_at: achievement.unlockedAt,
         updated_at: new Date().toISOString(),
       }));
 
@@ -193,11 +299,21 @@ export class DataSyncService {
       const { data, error } = await supabase
         .from('achievements')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', userId) // userId est maintenant l'email
         .order('unlocked_at', { ascending: false });
 
       if (error) throw error;
-      return { data, error: null };
+      
+      // Convertir les noms de colonnes de snake_case vers camelCase
+      const achievements: Achievement[] = data?.map((achievement: any) => ({
+        id: achievement.id,
+        title: achievement.title,
+        description: achievement.description,
+        icon: achievement.icon,
+        unlockedAt: achievement.unlocked_at,
+      })) || [];
+      
+      return { data: achievements, error: null };
     } catch (error) {
       console.error('Erreur lors de la récupération des réalisations:', error);
       return { data: null, error };
@@ -207,18 +323,50 @@ export class DataSyncService {
   // Synchroniser la série (streak)
   static async syncStreak(userId: string, streak: StreakData) {
     try {
-      const { data, error } = await supabase
+      // Valider et nettoyer la date
+      const lastDateConnected = streak.lastDateConnected && streak.lastDateConnected.trim() !== '' 
+        ? streak.lastDateConnected 
+        : new Date().toISOString().split('T')[0]; // Date du jour si vide
+
+      // D'abord, essayer de récupérer l'enregistrement existant
+      const { data: existingData } = await supabase
         .from('user_streaks')
-        .upsert({
-          user_id: userId,
-          ...streak,
-          updated_at: new Date().toISOString(),
-        })
-        .select()
+        .select('*')
+        .eq('user_id', userId) // userId est maintenant l'email
         .single();
 
-      if (error) throw error;
-      return { data, error: null };
+      if (existingData) {
+        // Mettre à jour l'enregistrement existant
+        const { data, error } = await supabase
+          .from('user_streaks')
+          .update({
+            last_date_connected: lastDateConnected,
+            current_streak: streak.currentStreak,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', userId) // userId est maintenant l'email // userId est maintenant l'email
+          .select()
+          .single();
+
+        if (error) throw error;
+        return { data, error: null };
+      } else {
+        // Créer un nouvel enregistrement
+        const { data, error } = await supabase
+          .from('user_streaks')
+          .insert({
+            user_id: userId, // userId est maintenant l'email
+            last_date_connected: lastDateConnected,
+            current_streak: streak.currentStreak,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return { data, error: null };
+      }
     } catch (error) {
       console.error('Erreur lors de la synchronisation de la série:', error);
       return { data: null, error };
@@ -231,11 +379,22 @@ export class DataSyncService {
       const { data, error } = await supabase
         .from('user_streaks')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', userId) // userId est maintenant l'email
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
-      return { data, error: null };
+      if (error && error.code !== 'PGRST116') {
+        console.error('Erreur détaillée série:', error);
+        throw error;
+      }
+      
+      // Convertir les noms de colonnes de snake_case vers camelCase
+      const streak: StreakData = data ? {
+        lastDateConnected: data.last_date_connected,
+        currentStreak: data.current_streak,
+      } : null;
+      
+      console.log('Série récupérée:', { data, streak, error });
+      return { data: streak, error: null };
     } catch (error) {
       console.error('Erreur lors de la récupération de la série:', error);
       return { data: null, error };
@@ -246,8 +405,13 @@ export class DataSyncService {
   static async syncHealthBenefits(userId: string, benefits: HealthBenefit[]) {
     try {
       const benefitsWithUserId = benefits.map(benefit => ({
-        ...benefit,
-        user_id: userId,
+        id: benefit.id,
+        user_id: userId, // userId est maintenant l'email
+        title: benefit.title,
+        description: benefit.description,
+        time_required: benefit.timeRequired,
+        unlocked: benefit.unlocked,
+        unlocked_at: benefit.unlockedAt,
         updated_at: new Date().toISOString(),
       }));
 
@@ -270,11 +434,23 @@ export class DataSyncService {
       const { data, error } = await supabase
         .from('health_benefits')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', userId) // userId est maintenant l'email
         .order('time_required', { ascending: true });
 
       if (error) throw error;
-      return { data, error: null };
+      
+      // Convertir les noms de colonnes de snake_case vers camelCase
+      const benefits: HealthBenefit[] = data?.map((benefit: any) => ({
+        id: benefit.id,
+        title: benefit.title,
+        description: benefit.description,
+        timeRequired: benefit.time_required,
+        unlocked: benefit.unlocked,
+        unlockedAt: benefit.unlocked_at,
+        userId: benefit.user_id,
+      })) || [];
+      
+      return { data: benefits, error: null };
     } catch (error) {
       console.error('Erreur lors de la récupération des bienfaits santé:', error);
       return { data: null, error };

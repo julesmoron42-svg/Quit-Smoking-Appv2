@@ -11,12 +11,16 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { sessionStorage, dailyEntriesStorage, streakStorage, profileStorage, settingsStorage } from '../lib/storage';
+import { testUserDataSync } from '../lib/testSync';
+import { testSupabaseConnection } from '../lib/testConnection';
 import { 
   formatTime, 
   getBallColor, 
   getSeedState, 
   getProgressiveGoal,
   calculateValidStreak,
+  calculateConnectionStreak,
+  calculateSessionStreak,
   calculateCigarettesAvoided,
   calculateMoneySaved,
   getSeedProgress,
@@ -45,6 +49,7 @@ export default function MainTab() {
     cigsPerDay: 20,
     objectiveType: 'complete',
     reductionFrequency: 1,
+    onboardingCompleted: false, // Explicitement défini à false par défaut
   });
   const [settings, setSettings] = useState<AppSettings>({
     pricePerCig: 0.6,
@@ -64,38 +69,17 @@ export default function MainTab() {
 
   // Vérifier si l'onboarding est nécessaire
   useEffect(() => {
-    if (!profile.onboardingCompleted) {
+    // Vérifier seulement après que les données ont été chargées
+    if (profile && profile.onboardingCompleted === false) {
       setOnboardingVisible(true);
+    } else if (profile && profile.onboardingCompleted === true) {
+      setOnboardingVisible(false);
     }
-  }, [profile]);
+  }, [profile.onboardingCompleted]);
 
-  // Vérifier le reset du streak au chargement
-  useEffect(() => {
-    const checkStreakReset = () => {
-      const today = new Date().toISOString().split('T')[0];
-      const { shouldReset, daysMissed } = checkAndResetStreak(dailyEntries, today);
-      
-      if (shouldReset && daysMissed > 1) {
-        // Reset du streak si plus d'un jour manqué
-        const newStreak: StreakData = {
-          lastDateConnected: today,
-          currentStreak: 0,
-        };
-        setStreak(newStreak);
-        streakStorage.set(newStreak);
-        
-        Alert.alert(
-          'Série interrompue',
-          `Vous avez manqué ${daysMissed} jour(s). Votre série recommence à 0. 🌱`,
-          [{ text: 'OK' }]
-        );
-      }
-    };
-
-    if (Object.keys(dailyEntries).length > 0) {
-      checkStreakReset();
-    }
-  }, [dailyEntries]);
+  // Pas de reset automatique du streak au chargement
+  // Le streak est géré uniquement lors de la saisie des entrées quotidiennes
+  // Cela évite les pertes de streak non désirées
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -123,6 +107,7 @@ export default function MainTab() {
       ...benefit,
       unlocked: elapsed >= benefit.timeRequired * 60 * 1000,
       unlockedAt: elapsed >= benefit.timeRequired * 60 * 1000 ? new Date().toISOString() : undefined,
+      progress: Math.min(100, (elapsed / (benefit.timeRequired * 60 * 1000)) * 100),
     }));
   };
 
@@ -138,9 +123,47 @@ export default function MainTab() {
       
       setSession(sessionData);
       setDailyEntries(entriesData);
-      setStreak(streakData);
-      setProfile(profileData);
       setSettings(settingsData);
+      
+      // Gérer le profil avec une valeur par défaut si pas encore créé
+      const defaultProfile: UserProfile = {
+        startedSmokingYears: 0,
+        cigsPerDay: 20,
+        objectiveType: 'complete',
+        reductionFrequency: 1,
+        onboardingCompleted: false,
+      };
+      
+      // Si on a un profil existant, vérifier s'il a des données d'onboarding
+      if (profileData) {
+        // Si le profil a des données d'onboarding mais onboardingCompleted n'est pas défini,
+        // on considère qu'il a été complété
+        if (profileData.smokingYears !== undefined && profileData.onboardingCompleted === undefined) {
+          profileData.onboardingCompleted = true;
+          // Sauvegarder le profil mis à jour
+          await profileStorage.set(profileData);
+        }
+        setProfile(profileData);
+      } else {
+        setProfile(defaultProfile);
+      }
+
+      // Recalculer le streak basé sur les entrées existantes (sans reset)
+      if (Object.keys(entriesData).length > 0) {
+        const sortedDates = Object.keys(entriesData).sort().reverse();
+        const lastEntryDate = sortedDates[0];
+        
+        // Utiliser le streak basé sur les connexions (entrées quotidiennes)
+        const connectionStreak = calculateConnectionStreak(entriesData, lastEntryDate);
+        
+        const updatedStreak: StreakData = {
+          lastDateConnected: lastEntryDate,
+          currentStreak: connectionStreak,
+        };
+        setStreak(updatedStreak);
+      } else {
+        setStreak(streakData);
+      }
 
       // Les bienfaits santé sont calculés en temps réel basés sur le compteur
 
@@ -152,10 +175,7 @@ export default function MainTab() {
 
       setElapsed(elapsedTime);
 
-      // Vérifier si c'est la première utilisation
-      if (!profileData.onboardingCompleted) {
-        setOnboardingVisible(true);
-      }
+      // L'onboarding sera géré par le useEffect dédié
     } catch (error) {
       console.error('Erreur lors du chargement des données:', error);
     }
@@ -177,7 +197,7 @@ export default function MainTab() {
   const handleRestart = async () => {
     Alert.alert(
       'Redémarrer',
-      'Êtes-vous sûr de vouloir redémarrer le chronomètre ?',
+      'Êtes-vous sûr de vouloir redémarrer le chronomètre ? Tous vos progrès santé seront remis à zéro.',
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -193,6 +213,13 @@ export default function MainTab() {
             setSession(newSession);
             setElapsed(0);
             await sessionStorage.set(newSession);
+            
+            // Afficher un message de confirmation
+            Alert.alert(
+              'Chronomètre redémarré',
+              'Votre chronomètre a été remis à zéro. Tous vos bénéfices santé ont été réinitialisés.',
+              [{ text: 'OK' }]
+            );
           },
         },
       ]
@@ -224,14 +251,15 @@ export default function MainTab() {
       setDailyEntries(newEntries);
       await dailyEntriesStorage.set(newEntries);
       
-      // Recalculer le streak valide
-      const validStreak = calculateValidStreak(newEntries, entry.date);
-      const newStreak: StreakData = {
+      // Recalculer le streak basé sur les connexions (entrées quotidiennes)
+      const connectionStreak = calculateConnectionStreak(newEntries, entry.date);
+      const newStreakData: StreakData = {
         lastDateConnected: entry.date,
-        currentStreak: validStreak,
+        currentStreak: connectionStreak,
       };
-      setStreak(newStreak);
-      await streakStorage.set(newStreak);
+      
+      setStreak(newStreakData);
+      await streakStorage.set(newStreakData);
       
       // Afficher un message de confirmation avec les statistiques mises à jour
       const cigarettesAvoided = calculateCigarettesAvoided(profile, newEntries, elapsed);
@@ -244,7 +272,7 @@ export default function MainTab() {
         objectiveMet: entry.objectiveMet,
         cigarettesAvoided,
         moneySaved,
-        streak: validStreak
+        streak: newStreakData.currentStreak
       });
       
       // Afficher un résumé des statistiques
@@ -559,9 +587,37 @@ export default function MainTab() {
               <Text style={styles.actionButtonText}>Recommencer</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.actionButton, styles.moreButton]}>
-              <Text style={styles.actionButtonIcon}>⋯</Text>
-              <Text style={styles.actionButtonText}>Plus</Text>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.moreButton, { opacity: 0.5 }]}
+              onPress={() => {
+                console.log('🚫 Test de connexion DÉSACTIVÉ pour éviter le spam');
+                Alert.alert('Désactivé', 'Test désactivé pour éviter le spam');
+              }}
+            >
+              <Text style={styles.actionButtonIcon}>🚫</Text>
+              <Text style={styles.actionButtonText}>Test OFF</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.moreButton, { backgroundColor: '#10B981', opacity: 0.5 }]}
+              onPress={() => {
+                console.log('🚫 Load DÉSACTIVÉ pour éviter le spam');
+                Alert.alert('Désactivé', 'Load désactivé pour éviter le spam');
+              }}
+            >
+              <Text style={styles.actionButtonIcon}>🚫</Text>
+              <Text style={styles.actionButtonText}>Load OFF</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.moreButton, { backgroundColor: '#F59E0B', opacity: 0.5 }]}
+              onPress={() => {
+                console.log('🚫 Sync DÉSACTIVÉ pour éviter le spam');
+                Alert.alert('Désactivé', 'Sync désactivé pour éviter le spam');
+              }}
+            >
+              <Text style={styles.actionButtonIcon}>🚫</Text>
+              <Text style={styles.actionButtonText}>Sync OFF</Text>
             </TouchableOpacity>
           </View>
 
@@ -647,6 +703,34 @@ export default function MainTab() {
               const accomplishedGoals = currentBenefits.filter(benefit => benefit.unlocked);
               
               if (accomplishedGoals.length === 0) {
+                // Afficher le prochain objectif avec sa progression
+                const nextGoal = currentBenefits.find(benefit => !benefit.unlocked);
+                if (nextGoal) {
+                  return (
+                    <TouchableOpacity 
+                      style={styles.healthGoalCard}
+                      onPress={() => {
+                        // Navigation vers l'onglet Analytics avec paramètre pour aller à Santé
+                        console.log('MainTab - Navigating to Analytics with initialRoute: Santé');
+                        navigation.navigate('Analytics', { initialRoute: 'Santé' });
+                      }}
+                    >
+                      <Text style={styles.healthGoalText}>
+                        🎯 Prochain objectif : {nextGoal.title}
+                      </Text>
+                      <Text style={styles.healthGoalSubtext}>
+                        {nextGoal.description}
+                      </Text>
+                      <View style={styles.healthProgressBar}>
+                        <View style={[styles.healthProgressFill, { width: `${nextGoal.progress}%` }]} />
+                      </View>
+                      <Text style={styles.healthGoalTimeRemaining}>
+                        {Math.round(nextGoal.progress)}% accompli
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                }
+                
                 return (
                   <TouchableOpacity 
                     style={styles.healthGoalCard}

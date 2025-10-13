@@ -137,36 +137,45 @@ export default function OnboardingModal({ visible, onComplete }: OnboardingModal
   };
 
   const validateData = (): boolean => {
+    console.log('Validation des données onboarding:', data);
+    
     // Validation des champs obligatoires
     if (!data.smokingYears || data.smokingYears < 0) {
+      console.log('Erreur: smokingYears invalide');
       Alert.alert('Erreur', 'Veuillez entrer un nombre d\'années valide');
       return false;
     }
     if (!data.cigsPerDay || data.cigsPerDay < 1) {
+      console.log('Erreur: cigsPerDay invalide');
       Alert.alert('Erreur', 'Veuillez entrer un nombre de cigarettes valide');
       return false;
     }
     if (!data.smokingPeakTime || !data.mainGoal || !data.mainMotivation || 
         !data.previousAttempts || !data.smokingTriggers?.length || 
         !data.smokingSituations?.length) {
+      console.log('Erreur: champs obligatoires manquants');
       Alert.alert('Erreur', 'Veuillez répondre à toutes les questions');
       return false;
     }
     
     // Validation conditionnelle selon l'objectif
     if (data.mainGoal === 'complete_stop' && !data.targetDate) {
+      console.log('Erreur: targetDate manquante pour arrêt complet');
       Alert.alert('Erreur', 'Veuillez sélectionner une date d\'arrêt');
       return false;
     }
     if (data.mainGoal === 'progressive_reduction' && (!data.reductionFrequency || data.reductionFrequency < 1)) {
+      console.log('Erreur: reductionFrequency invalide');
       Alert.alert('Erreur', 'Veuillez définir une fréquence de réduction valide (au moins 1 cigarette par semaine)');
       return false;
     }
     
+    console.log('Validation réussie');
     return true;
   };
 
   const handleInputChange = (key: string, value: any) => {
+    console.log(`Onboarding: ${key} = ${value}`);
     setData(prev => ({ ...prev, [key]: value }));
   };
 

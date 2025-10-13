@@ -14,6 +14,7 @@ import * as FileSystem from 'expo-file-system';
 import { settingsStorage, exportAllData, importData, storage } from '../lib/storage';
 import { AppSettings, ExportData } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { DebugPanel } from '../components/DebugPanel';
 
 export default function SettingsTab() {
   const { user, signOut } = useAuth();
@@ -24,6 +25,15 @@ export default function SettingsTab() {
     language: 'fr',
     animationsEnabled: true,
   });
+
+  // Debug: Log de l'état de l'utilisateur
+  useEffect(() => {
+    console.log('🔍 SettingsTab: État utilisateur:', { 
+      hasUser: !!user, 
+      userEmail: user?.email,
+      userId: user?.id 
+    });
+  }, [user]);
 
   useEffect(() => {
     loadSettings();
@@ -357,6 +367,17 @@ export default function SettingsTab() {
             </TouchableOpacity>
           </View>
         )}
+
+        {/* Section Debug (temporaire) */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🔧 Debug Panel</Text>
+          <Text style={styles.debugDescription}>
+            Outils de diagnostic pour résoudre les problèmes de synchronisation des données
+          </Text>
+          <View style={styles.debugContainer}>
+            <DebugPanel />
+          </View>
+        </View>
         </ScrollView>
       </LinearGradient>
     </View>
@@ -601,5 +622,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 4,
     elevation: 4,
+  },
+  debugDescription: {
+    color: '#94A3B8',
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 15,
+    fontStyle: 'italic',
+  },
+  debugContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    height: 300,
   },
 });

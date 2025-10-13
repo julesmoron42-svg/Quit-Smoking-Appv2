@@ -351,16 +351,32 @@ function HealthScreen() {
 
   useEffect(() => {
     loadData();
+    
+    // Mettre à jour le temps écoulé en temps réel
+    const interval = setInterval(() => {
+      updateElapsedTime();
+    }, 1000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const loadData = async () => {
     const benefits = getHealthBenefits();
     setHealthBenefits(benefits);
-    
-    // Récupérer le temps écoulé depuis le session storage
+    await updateElapsedTime();
+  };
+
+  const updateElapsedTime = async () => {
     try {
       const sessionData = await sessionStorage.get();
-      setSessionElapsed(sessionData?.elapsedBeforePause || 0);
+      const now = Date.now();
+      
+      // Calculer le temps écoulé total comme dans MainTab
+      const elapsedTime = sessionData.isRunning && sessionData.startTimestamp
+        ? now - sessionData.startTimestamp + sessionData.elapsedBeforePause
+        : sessionData.elapsedBeforePause;
+        
+      setSessionElapsed(elapsedTime);
     } catch (error) {
       console.error('Erreur lors du chargement de la session:', error);
       setSessionElapsed(0);
@@ -411,6 +427,7 @@ function HealthScreen() {
         </Text>
         
         {updatedBenefits.map((benefit) => {
+          // Calculer le progrès en pourcentage (0-100)
           const progress = Math.min(100, (sessionElapsed / (benefit.timeRequired * 60 * 1000)) * 100);
           const timeRemaining = Math.max(0, benefit.timeRequired * 60 * 1000 - sessionElapsed);
           
@@ -424,8 +441,12 @@ function HealthScreen() {
             timeRemainingText = '✅ Atteint !';
           } else if (yearsRemaining > 0) {
             timeRemainingText = `${yearsRemaining} an${yearsRemaining > 1 ? 's' : ''} et ${remainingDays} jour${remainingDays > 1 ? 's' : ''} restant${yearsRemaining > 1 || remainingDays > 1 ? 's' : ''}`;
-          } else {
+          } else if (daysRemaining > 0) {
             timeRemainingText = `${daysRemaining} jour${daysRemaining > 1 ? 's' : ''} restant${daysRemaining > 1 ? 's' : ''}`;
+          } else {
+            // Moins d'un jour restant, afficher en heures
+            const hoursRemaining = Math.ceil(timeRemaining / (60 * 60 * 1000));
+            timeRemainingText = `${hoursRemaining} heure${hoursRemaining > 1 ? 's' : ''} restante${hoursRemaining > 1 ? 's' : ''}`;
           }
 
           return (

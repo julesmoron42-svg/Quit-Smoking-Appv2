@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { clearLocalDataOnUserChange, syncAllDataWithUser, loadAllDataFromSupabase, sessionStorage } from '../lib/storage';
 
 interface AuthContextType {
   user: User | null;
@@ -24,22 +25,73 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // console.log('🔍 AuthContext: Initialisation...');
+    
     // Récupérer la session actuelle
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      // console.log('🔍 AuthContext: Session récupérée:', { 
+      //   hasSession: !!session, 
+      //   hasUser: !!session?.user,
+      //   userEmail: session?.user?.email,
+      //   error: error?.message 
+      // });
+      
       setSession(session);
       setUser(session?.user ?? null);
+      setLoading(false);
+      
+      // Si un utilisateur est connecté, charger les données depuis Supabase
+      if (session?.user) {
+        console.log('📥 Utilisateur connecté, chargement des données depuis Supabase...');
+        // Utiliser le chargement forcé pour s'assurer que les données sont bien chargées
+        setTimeout(async () => {
+          try {
+            const { forceLoadAllDataFromSupabase } = await import('../lib/storage');
+            await forceLoadAllDataFromSupabase();
+          } catch (error) {
+            console.error('Erreur chargement:', error);
+          }
+        }, 1000); // Délai de 1 seconde pour éviter les conflits
+      }
+    }).catch(error => {
+      console.error('❌ AuthContext: Erreur lors de la récupération de session:', error);
       setLoading(false);
     });
 
     // Écouter les changements d'authentification
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const previousUser = user;
+      
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Gérer les changements d'authentification
+      if (event === 'SIGNED_IN' && session?.user) {
+        // Vérifier si c'est un changement d'utilisateur
+        if (previousUser && previousUser.email !== session.user.email) {
+          console.log('👤 Changement d\'utilisateur détecté, réinitialisation du chrono');
+          await sessionStorage.resetForNewUser();
+        }
+        
+        // Utilisateur connecté - charger les données depuis Supabase
+        // console.log('📥 Connexion détectée, chargement des données depuis Supabase...');
+        // TEMPORAIREMENT DÉSACTIVÉ POUR ÉVITER LE SPAM
+        // await loadAllDataFromSupabase();
+      } else if (event === 'SIGNED_OUT' || (previousUser && !session?.user)) {
+        // Utilisateur déconnecté - nettoyer les données locales (chrono préservé)
+        console.log('🚪 Déconnexion détectée, nettoyage des données locales');
+        await clearLocalDataOnUserChange();
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        // Token rafraîchi - charger les données depuis Supabase
+        // console.log('📥 Token rafraîchi, chargement des données depuis Supabase...');
+        // TEMPORAIREMENT DÉSACTIVÉ POUR ÉVITER LE SPAM
+        // await loadAllDataFromSupabase();
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, []); // Suppression de [user] pour éviter la boucle infinie
 
   const signUp = async (email: string, password: string) => {
     try {

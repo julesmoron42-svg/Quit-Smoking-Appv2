@@ -242,18 +242,70 @@ export const calculateValidStreak = (
   let streak = 0;
   let checkDate = new Date(currentDate);
   
-  // Vérifier les jours en arrière
+  // Vérifier les jours en arrière, en commençant par aujourd'hui
   for (let i = 0; i < 365; i++) { // Max 1 an
     const dateStr = checkDate.toISOString().split('T')[0];
     const entry = dailyEntries[dateStr];
     
     if (entry && entry.objectiveMet) {
       streak++;
+      // Passer au jour précédent
       checkDate.setDate(checkDate.getDate() - 1);
     } else {
+      // Arrêter dès qu'on trouve un jour sans entrée ou sans objectif atteint
       break;
     }
   }
+  
+  return streak;
+};
+
+// Calcul du streak basé sur les jours de connexion (entrées quotidiennes)
+export const calculateConnectionStreak = (
+  dailyEntries: Record<string, DailyEntry>,
+  currentDate: string
+): number => {
+  const sortedDates = Object.keys(dailyEntries).sort();
+  if (sortedDates.length === 0) return 0;
+  
+  let streak = 0;
+  let checkDate = new Date(currentDate);
+  
+  // Vérifier les jours en arrière, en commençant par aujourd'hui
+  for (let i = 0; i < 365; i++) { // Max 1 an
+    const dateStr = checkDate.toISOString().split('T')[0];
+    const entry = dailyEntries[dateStr];
+    
+    if (entry) {
+      // Si on a une entrée (même si l'objectif n'est pas atteint), on compte le jour
+      streak++;
+      // Passer au jour précédent
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      // Arrêter dès qu'on trouve un jour sans entrée
+      break;
+    }
+  }
+  
+  return streak;
+};
+
+// Calcul du streak basé sur la session du chrono (pour les utilisateurs qui se connectent quotidiennement)
+export const calculateSessionStreak = (
+  sessionElapsed: number,
+  currentDate: string
+): number => {
+  console.log('🔍 calculateSessionStreak - Temps écoulé:', sessionElapsed);
+  console.log('🔍 calculateSessionStreak - Date actuelle:', currentDate);
+  
+  // Calculer le nombre de jours depuis le début de la session
+  const daysElapsed = Math.floor(sessionElapsed / (24 * 60 * 60 * 1000));
+  
+  // Si on a moins de 24h, on considère qu'on est au jour 1
+  const streak = Math.max(1, daysElapsed + 1);
+  
+  console.log('🔍 calculateSessionStreak - Jours écoulés:', daysElapsed);
+  console.log('🔍 calculateSessionStreak - Streak calculé:', streak);
   
   return streak;
 };
@@ -264,40 +316,29 @@ export const checkAndResetStreak = (
   currentDate: string
 ): { shouldReset: boolean; daysMissed: number } => {
   const today = new Date(currentDate);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  
   const todayStr = today.toISOString().split('T')[0];
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
   
   // Si on a une entrée aujourd'hui, pas de reset
   if (dailyEntries[todayStr]) {
     return { shouldReset: false, daysMissed: 0 };
   }
   
-  // Compter les jours manqués depuis la dernière entrée
-  let daysMissed = 0;
-  let checkDate = new Date(yesterday);
-  
   // Trouver la dernière entrée
   const sortedDates = Object.keys(dailyEntries).sort().reverse();
   if (sortedDates.length === 0) {
-    return { shouldReset: true, daysMissed: 1 };
+    // Pas d'entrées du tout, pas de reset automatique
+    return { shouldReset: false, daysMissed: 0 };
   }
   
   const lastEntryDate = new Date(sortedDates[0]);
+  const daysSinceLastEntry = Math.floor((today.getTime() - lastEntryDate.getTime()) / (24 * 60 * 60 * 1000));
   
-  // Compter les jours manqués depuis la dernière entrée
-  while (checkDate >= lastEntryDate) {
-    const dateStr = checkDate.toISOString().split('T')[0];
-    if (!dailyEntries[dateStr]) {
-      daysMissed++;
-    }
-    checkDate.setDate(checkDate.getDate() - 1);
-  }
-  
-  // Reset si plus d'un jour manqué
-  return { shouldReset: daysMissed > 1, daysMissed };
+  // Reset seulement si plus de 2 jours se sont écoulés depuis la dernière entrée
+  // Cela laisse du temps jusqu'à 23h59 pour saisir l'entrée du jour
+  return { 
+    shouldReset: daysSinceLastEntry > 2, 
+    daysMissed: daysSinceLastEntry 
+  };
 };
 
 // Calcul de la couleur de la boule basée sur le progrès
