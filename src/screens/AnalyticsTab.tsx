@@ -8,6 +8,7 @@ import {
   Dimensions,
   TextInput,
   Modal,
+  TouchableWithoutFeedback,
   Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -30,13 +31,24 @@ const { width } = Dimensions.get('window');
 const Tab = createMaterialTopTabNavigator();
 
 // Fonction pour créer un graphique SVG simple
-const createSimpleChart = (data: any, width: number, height: number, period: string = '1M') => {
+const createSimpleChart = (data: any, width: number, height: number, period: string = '1M', onTouch?: (x: number, values: any) => void) => {
   const chartWidth = width - 40;
   const chartHeight = height - 40;
   const paddingLeft = 40;
   const paddingRight = 20;
   const paddingTop = 20;
   const paddingBottom = 20;
+  
+  // Fonction helper pour convertir les périodes en jours
+  const getDaysForPeriod = (period: string) => {
+    switch (period) {
+      case '1M': return 30;
+      case '6M': return 180;
+      case '1Y': return 365;
+      case '10Y': return 3650;
+      default: return 30;
+    }
+  };
   
   // Vérifier que les données existent
   if (!data || !data.datasets || data.datasets.length === 0) {
@@ -135,17 +147,52 @@ const createSimpleChart = (data: any, width: number, height: number, period: str
   // Labels des dates (axe horizontal)
   if (data.datasets[0] && data.datasets[0].data) {
     const dataLength = data.datasets[0].data.length;
-    const today = new Date();
+    
+    // Calculer la date de début basée sur la période et la première entrée
+    const getStartDate = () => {
+      const today = new Date();
+      const daysForPeriod = getDaysForPeriod(period);
+      
+      if (period === '1M') {
+        // Pour 1M, commencer depuis aujourd'hui - 30 jours
+        return new Date(today.getTime() - (daysForPeriod - 1) * 24 * 60 * 60 * 1000);
+      } else {
+        // Pour 6M, 1Y, 10Y, commencer depuis la première entrée (septembre 2025)
+        const firstEntryDate = new Date('2025-09-01');
+        return firstEntryDate;
+      }
+    };
+    
+    const startDate = getStartDate();
     
     for (let i = 0; i < dataLength; i++) {
       const x = paddingLeft + (i / Math.max(dataLength - 1, 1)) * (chartWidth - paddingLeft - paddingRight);
       
       // Afficher les dates (tous les 5 points pour éviter la surcharge)
       if (i % Math.max(Math.floor(dataLength / 5), 1) === 0) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - (dataLength - 1 - i));
-        const day = date.getDate();
-        const month = date.getMonth() + 1;
+        const date = new Date(startDate);
+        
+        if (period === '1M') {
+          date.setDate(date.getDate() + i);
+        } else {
+          // Pour les périodes longues, calculer la date en fonction de la période
+          const daysForPeriod = getDaysForPeriod(period);
+          const daysPerPoint = daysForPeriod / dataLength;
+          date.setDate(date.getDate() + Math.round(i * daysPerPoint));
+        }
+        
+        let dateLabel = '';
+        if (period === '10Y') {
+          dateLabel = date.getFullYear().toString();
+        } else if (period === '6M' || period === '1Y') {
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const year = String(date.getFullYear()).slice(-2);
+          dateLabel = `${month}/${year}`;
+        } else {
+          const day = String(date.getDate()).padStart(2, '0');
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          dateLabel = `${day}/${month}`;
+        }
         
         axisLabels.push(
           <SvgText
@@ -156,7 +203,7 @@ const createSimpleChart = (data: any, width: number, height: number, period: str
             fill="#94A3B8"
             fontSize="9"
           >
-            {`${day}/${month}`}
+            {dateLabel}
           </SvgText>
         );
       }
@@ -206,6 +253,7 @@ const createSimpleChart = (data: any, width: number, height: number, period: str
 function CigarettesScreen() {
   const navigation = useNavigation();
   const [selectedPeriod, setSelectedPeriod] = useState<string>('1M');
+  const [cursorPosition, setCursorPosition] = useState<{x: number, values: any} | null>(null);
   const [profile, setProfile] = useState<UserProfile>({
     startedSmokingYears: 0,
     cigsPerDay: 20,
@@ -277,6 +325,11 @@ function CigarettesScreen() {
     };
   }
 
+  // Fonction pour gérer le touch sur le graphique
+  const handleChartTouch = (x: number, values: any) => {
+    setCursorPosition({ x, values });
+  };
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -312,62 +365,128 @@ function CigarettesScreen() {
             );
           })}
         </View>
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          <Text style={styles.screenTitle}>📊 Cigarettes</Text>
-          <Text style={styles.screenDescription}>
-            Évolution de votre consommation
-          </Text>
-          
-          {/* Sélecteur de période */}
-          <View style={styles.periodSelector}>
-            {['1M', '6M', '1Y', '10Y'].map((period) => (
-              <TouchableOpacity
-                key={period}
-                style={[
-                  styles.periodButton,
-                  selectedPeriod === period && styles.periodButtonActive
-                ]}
-                onPress={() => setSelectedPeriod(period)}
-              >
-                <Text style={[
-                  styles.periodButtonText,
-                  selectedPeriod === period && styles.periodButtonTextActive
-                ]}>
-                  {period}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          
-          {/* Graphique */}
-          <View style={styles.chartWrapper}>
-            {createSimpleChart(chartData, width, 300)}
-          </View>
+        
+        <TouchableWithoutFeedback onPress={() => cursorPosition && setCursorPosition(null)}>
+          <View style={styles.container}>
+            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+              <Text style={styles.screenTitle}>📊 Cigarettes</Text>
+              <Text style={styles.screenDescription}>
+                Évolution de votre consommation
+              </Text>
+              
+              {/* Sélecteur de période */}
+              <View style={styles.periodSelector}>
+                {['1M', '6M', '1Y', '10Y'].map((period) => (
+                  <TouchableOpacity
+                    key={period}
+                    style={[
+                      styles.periodButton,
+                      selectedPeriod === period && styles.periodButtonActive
+                    ]}
+                    onPress={() => setSelectedPeriod(period)}
+                  >
+                    <Text style={[
+                      styles.periodButtonText,
+                      selectedPeriod === period && styles.periodButtonTextActive
+                    ]}>
+                      {period}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              
+              {/* Graphique */}
+              <View style={styles.chartWrapper}>
+            <TouchableOpacity 
+              style={styles.chartContainer}
+              activeOpacity={1}
+              onPress={(event) => {
+                const { locationX } = event.nativeEvent;
+                const chartWidth = width - 40;
+                const paddingLeft = 40;
+                const relativeX = locationX - paddingLeft;
+                const dataIndex = Math.round((relativeX / (chartWidth - paddingLeft - 20)) * (chartData.datasets[0]?.data.length - 1));
+                
+                if (dataIndex >= 0 && dataIndex < chartData.datasets[0]?.data.length) {
+                  // Calculer la date correcte selon la période
+                  const getDateForIndex = (index: number) => {
+                    const today = new Date();
+                    const daysForPeriod = getDaysForPeriod(selectedPeriod);
+                    
+                    if (selectedPeriod === '1M') {
+                      // Pour 1M, commencer depuis aujourd'hui - 30 jours
+                      const startDate = new Date(today.getTime() - (daysForPeriod - 1) * 24 * 60 * 60 * 1000);
+                      return new Date(startDate.getTime() + index * 24 * 60 * 60 * 1000);
+                    } else {
+                      // Pour 6M, 1Y, 10Y, commencer depuis la première entrée (septembre 2025)
+                      const firstEntryDate = new Date('2025-09-01');
+                      const daysPerPoint = daysForPeriod / chartData.datasets[0]?.data.length;
+                      return new Date(firstEntryDate.getTime() + Math.round(index * daysPerPoint) * 24 * 60 * 60 * 1000);
+                    }
+                  };
+                  
+                  const values = {
+                    theoretical: chartData.datasets[0]?.data[dataIndex] || 0,
+                    real: chartData.datasets[1]?.data[dataIndex] || 0,
+                    date: getDateForIndex(dataIndex)
+                  };
+                  handleChartTouch(locationX, values);
+                }
+              }}
+            >
+              {createSimpleChart(chartData, width, 300, selectedPeriod)}
+              
+              {/* Curseur vertical */}
+              {cursorPosition && (
+                <View style={[styles.cursor, { left: cursorPosition.x - 1 }]} />
+              )}
+            </TouchableOpacity>
             
-            {/* Légende */}
-            <View style={styles.legend}>
-              <View style={styles.legendItem}>
-                <Svg width={20} height={3}>
-                  <Line
-                    x1={0}
-                    y1={1.5}
-                    x2={20}
-                    y2={1.5}
-                    stroke="#3B82F6"
-                    strokeWidth={2}
-                    strokeDasharray="3,3"
-                  />
-                </Svg>
-                <Text style={styles.legendText}>Projection théorique</Text>
+            {/* Popup avec les valeurs */}
+            {cursorPosition && (
+              <View style={[styles.valuePopup, { left: Math.min(Math.max(cursorPosition.x - 50, 10), width - 110) }]}>
+                <Text style={styles.popupDate}>
+                  {selectedPeriod === '10Y' 
+                    ? cursorPosition.values.date.getFullYear().toString()
+                    : selectedPeriod === '6M' || selectedPeriod === '1Y'
+                    ? `${String(cursorPosition.values.date.getMonth() + 1).padStart(2, '0')}/${String(cursorPosition.values.date.getFullYear()).slice(-2)}`
+                    : cursorPosition.values.date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+                  }
+                </Text>
+                <Text style={{ color: '#3B82F6', fontSize: 11, textAlign: 'center', marginBottom: 2 }}>
+                  Objectif: {Math.round(cursorPosition.values.theoretical)}
+                </Text>
+                <Text style={{ color: '#10B981', fontSize: 11, textAlign: 'center' }}>
+                  Réel: {Math.round(cursorPosition.values.real)}
+                </Text>
               </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendLine, { backgroundColor: '#10B981', borderWidth: 0 }]} />
-                <Text style={styles.legendText}>Consommation réelle</Text>
+            )}
+          </View>
+                
+              {/* Légende */}
+              <View style={styles.legend}>
+                <View style={styles.legendItem}>
+                  <Svg width={20} height={3}>
+                    <Line
+                      x1={0}
+                      y1={1.5}
+                      x2={20}
+                      y2={1.5}
+                      stroke="#3B82F6"
+                      strokeWidth={2}
+                      strokeDasharray="3,3"
+                    />
+                  </Svg>
+                  <Text style={styles.legendText}>Projection théorique</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendLine, { backgroundColor: '#10B981', borderWidth: 0 }]} />
+                  <Text style={styles.legendText}>Consommation réelle</Text>
+                </View>
               </View>
-            </View>
-
-          
-        </ScrollView>
+            </ScrollView>
+          </View>
+        </TouchableWithoutFeedback>
       </LinearGradient>
     </View>
   );
@@ -377,6 +496,7 @@ function CigarettesScreen() {
 function SavingsScreen() {
   const navigation = useNavigation();
   const [selectedPeriod, setSelectedPeriod] = useState<string>('1M');
+  const [cursorPosition, setCursorPosition] = useState<{x: number, values: any} | null>(null);
   const [profile, setProfile] = useState<UserProfile>({
     startedSmokingYears: 0,
     cigsPerDay: 20,
@@ -468,6 +588,11 @@ function SavingsScreen() {
     };
   }
 
+  // Fonction pour gérer le touch sur le graphique
+  const handleChartTouch = (x: number, values: any) => {
+    setCursorPosition({ x, values });
+  };
+
 
   return (
     <View style={styles.container}>
@@ -504,8 +629,11 @@ function SavingsScreen() {
             );
           })}
         </View>
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          <Text style={styles.screenTitle}>💰 Économies</Text>
+        
+        <TouchableWithoutFeedback onPress={() => cursorPosition && setCursorPosition(null)}>
+          <View style={styles.container}>
+            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+              <Text style={styles.screenTitle}>💰 Économies</Text>
           <Text style={styles.screenDescription}>
             Évolution cumulative de vos économies
           </Text>
@@ -533,7 +661,70 @@ function SavingsScreen() {
           
           {/* Graphique */}
           <View style={styles.chartWrapper}>
-            {createSimpleChart(chartData, width, 300)}
+            <TouchableOpacity 
+              style={styles.chartContainer}
+              activeOpacity={1}
+              onPress={(event) => {
+                const { locationX } = event.nativeEvent;
+                const chartWidth = width - 40;
+                const paddingLeft = 40;
+                const relativeX = locationX - paddingLeft;
+                const dataIndex = Math.round((relativeX / (chartWidth - paddingLeft - 20)) * (chartData.datasets[0]?.data.length - 1));
+                
+                if (dataIndex >= 0 && dataIndex < chartData.datasets[0]?.data.length) {
+                  // Calculer la date correcte selon la période
+                  const getDateForIndex = (index: number) => {
+                    const today = new Date();
+                    const daysForPeriod = getDaysForPeriod(selectedPeriod);
+                    
+                    if (selectedPeriod === '1M') {
+                      // Pour 1M, commencer depuis aujourd'hui - 30 jours
+                      const startDate = new Date(today.getTime() - (daysForPeriod - 1) * 24 * 60 * 60 * 1000);
+                      return new Date(startDate.getTime() + index * 24 * 60 * 60 * 1000);
+                    } else {
+                      // Pour 6M, 1Y, 10Y, commencer depuis la première entrée (septembre 2025)
+                      const firstEntryDate = new Date('2025-09-01');
+                      const daysPerPoint = daysForPeriod / chartData.datasets[0]?.data.length;
+                      return new Date(firstEntryDate.getTime() + Math.round(index * daysPerPoint) * 24 * 60 * 60 * 1000);
+                    }
+                  };
+                  
+                  const values = {
+                    theoretical: chartData.datasets[0]?.data[dataIndex] || 0,
+                    real: chartData.datasets[1]?.data[dataIndex] || 0,
+                    date: getDateForIndex(dataIndex)
+                  };
+                  handleChartTouch(locationX, values);
+                }
+              }}
+            >
+              {createSimpleChart(chartData, width, 300, selectedPeriod)}
+              
+              {/* Curseur vertical */}
+              {cursorPosition && (
+                <View style={[styles.cursor, { left: cursorPosition.x - 1 }]} />
+              )}
+            </TouchableOpacity>
+            
+            {/* Popup avec les valeurs */}
+            {cursorPosition && (
+              <View style={[styles.valuePopup, { left: Math.min(Math.max(cursorPosition.x - 50, 10), width - 110) }]}>
+                <Text style={styles.popupDate}>
+                  {selectedPeriod === '10Y' 
+                    ? cursorPosition.values.date.getFullYear().toString()
+                    : selectedPeriod === '6M' || selectedPeriod === '1Y'
+                    ? `${String(cursorPosition.values.date.getMonth() + 1).padStart(2, '0')}/${String(cursorPosition.values.date.getFullYear()).slice(-2)}`
+                    : cursorPosition.values.date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+                  }
+                </Text>
+                <Text style={{ color: '#3B82F6', fontSize: 11, textAlign: 'center', marginBottom: 2 }}>
+                  Objectif: {Math.round(cursorPosition.values.theoretical)}€
+                </Text>
+                <Text style={{ color: '#10B981', fontSize: 11, textAlign: 'center' }}>
+                  Réel: {Math.round(cursorPosition.values.real)}€
+                </Text>
+              </View>
+            )}
             
             {/* Légende */}
             <View style={styles.legend}>
@@ -580,6 +771,8 @@ function SavingsScreen() {
             </View>
           </View>
         </ScrollView>
+          </View>
+        </TouchableWithoutFeedback>
       </LinearGradient>
     </View>
   );
@@ -762,8 +955,8 @@ function HealthScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-        </ScrollView>
-      </LinearGradient>
+      </ScrollView>
+    </LinearGradient>
     </View>
   );
 }
@@ -1148,6 +1341,66 @@ const styles = StyleSheet.create({
   periodButtonTextActive: {
     color: '#FFFFFF',
     fontWeight: '600',
+  },
+  chartContainer: {
+    position: 'relative',
+  },
+  cursor: {
+    position: 'absolute',
+    top: 20, // Commencer à partir de l'axe X
+    bottom: 20, // S'arrêter avant le bas
+    width: 2,
+    backgroundColor: '#64748B',
+    zIndex: 10,
+  },
+  valuePopup: {
+    position: 'absolute',
+    top: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    borderRadius: 6,
+    padding: 8,
+    minWidth: 100,
+    zIndex: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  popupCloseButton: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  popupCloseText: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  popupDate: {
+    color: '#F59E0B',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  popupValue: {
+    color: '#F8FAFC',
+    fontSize: 11,
+    marginBottom: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  popupLabel: {
+    color: '#94A3B8',
+    fontSize: 10,
+  },
+  popupIndicator: {
+    width: 8,
+    height: 2,
+    marginRight: 6,
+    borderRadius: 1,
   },
   dataContainer: {
     marginBottom: 20,

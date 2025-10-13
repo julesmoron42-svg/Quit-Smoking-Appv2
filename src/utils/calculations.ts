@@ -200,17 +200,40 @@ export const getSeedState = (streak: number, totalDays: number = 60): 'seed' | '
 export const getProgressiveGoal = (
   profile: UserProfile,
   dayIndex: number,
-  totalDays: number = 60
+  totalDays: number = 60,
+  startDate?: Date
 ): number => {
+  const startCigs = profile.cigsPerDay;
+  
+  // Si arrêt immédiat (complete) et date d'arrêt définie
+  if (profile.objectiveType === 'complete' && profile.targetDate) {
+    const targetDate = new Date(profile.targetDate);
+    const currentDate = startDate ? new Date(startDate.getTime() + dayIndex * 24 * 60 * 60 * 1000) : new Date();
+    
+    // Si on est après la date d'arrêt, consommation = 0
+    if (currentDate >= targetDate) {
+      return 0;
+    }
+    
+    // Avant la date d'arrêt, consommation normale
+    return startCigs;
+  }
+  
+  // Si arrêt immédiat sans date spécifique, retourner 0
   if (profile.objectiveType === 'complete') {
     return 0;
   }
   
-  const startCigs = profile.cigsPerDay;
-  const endCigs = 0;
-  const reductionPerPhase = startCigs / (totalDays / (profile.reductionFrequency || 1));
+  // Si réduction progressive
+  const reductionPerWeek = profile.reductionFrequency || 1; // cigarettes à réduire par semaine
   
-  return Math.max(endCigs, Math.floor(startCigs - (dayIndex * reductionPerPhase)));
+  // Calculer le nombre de semaines écoulées
+  const weeksElapsed = Math.floor(dayIndex / 7);
+  
+  // Calculer la consommation théorique : diminuer de reductionPerWeek cigarettes par semaine
+  const theoreticalCigs = Math.max(0, startCigs - (weeksElapsed * reductionPerWeek));
+  
+  return Math.floor(theoreticalCigs);
 };
 
 // Calcul du pourcentage de progression de la graine
@@ -389,7 +412,7 @@ export const generateCigarettesChartData = (
     const dateString = date.toISOString().split('T')[0];
     
     // Calcul théorique (projection de réduction)
-    const theoreticalCigs = getProgressiveGoal(profile, i, daysToShow);
+    const theoreticalCigs = getProgressiveGoal(profile, i, daysToShow, startDate);
     theoreticalData.push(theoreticalCigs);
     
     // Données réelles
@@ -469,7 +492,7 @@ export const generateSavingsChartData = (
     const dateString = date.toISOString().split('T')[0];
     
     // Calcul théorique cumulatif
-    const theoreticalCigs = getProgressiveGoal(profile, i, daysToShow);
+    const theoreticalCigs = getProgressiveGoal(profile, i, daysToShow, startDate);
     const dailyTheoreticalSavings = Math.max(0, profile.cigsPerDay - theoreticalCigs) * pricePerCig;
     theoreticalCumulative += dailyTheoreticalSavings;
     theoreticalData.push(theoreticalCumulative);
