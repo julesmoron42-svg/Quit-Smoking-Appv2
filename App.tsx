@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import * as Notifications from 'expo-notifications';
 
 // Import des contextes et écrans
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
@@ -12,6 +13,7 @@ import MainTab from './src/screens/MainTab';
 import ProfileTab from './src/screens/ProfileTab';
 import AnalyticsTab from './src/screens/AnalyticsTab';
 import SettingsTab from './src/screens/SettingsTab';
+import { notificationService, NotificationData } from './src/lib/notificationService';
 
 const Tab = createBottomTabNavigator();
 
@@ -19,6 +21,7 @@ const Tab = createBottomTabNavigator();
 function MainApp() {
   const { user, loading } = useAuth();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [shouldOpenDailyEntry, setShouldOpenDailyEntry] = useState(false);
 
   useEffect(() => {
     if (user && !loading) {
@@ -27,6 +30,25 @@ function MainApp() {
       setIsAuthenticated(false);
     }
   }, [user, loading]);
+
+  // Configuration de la gestion des clics sur les notifications
+  useEffect(() => {
+    const handleNotificationResponse = (response: Notifications.NotificationResponse) => {
+      const data = response.notification.request.content.data as NotificationData;
+      
+      if (data?.action === 'open_daily_entry') {
+        console.log('🔔 Notification cliquée, ouverture de l\'overlay de saisie quotidienne');
+        setShouldOpenDailyEntry(true);
+      }
+    };
+
+    // Configurer le gestionnaire de notifications
+    notificationService.setNotificationResponseHandler(handleNotificationResponse);
+
+    return () => {
+      // Cleanup si nécessaire
+    };
+  }, []);
 
   const handleAuthSuccess = () => {
     setIsAuthenticated(true);
@@ -91,12 +113,19 @@ function MainApp() {
       >
         <Tab.Screen 
           name="Accueil" 
-          component={MainTab}
           options={{
             title: '🌱',
             headerTitle: '🌱 MyQuitZone',
           }}
-        />
+        >
+          {(props) => (
+            <MainTab 
+              {...props} 
+              shouldOpenDailyEntry={shouldOpenDailyEntry}
+              onDailyEntryClosed={() => setShouldOpenDailyEntry(false)}
+            />
+          )}
+        </Tab.Screen>
         <Tab.Screen 
           name="Profil" 
           component={ProfileTab}

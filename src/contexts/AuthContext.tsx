@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { clearLocalDataOnUserChange, syncAllDataWithUser, loadAllDataFromSupabase, sessionStorage } from '../lib/storage';
+import { notificationService } from '../lib/notificationService';
 
 interface AuthContextType {
   user: User | null;
@@ -23,6 +24,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Initialiser le service de notifications
+  useEffect(() => {
+    notificationService.initialize();
+  }, []);
 
   useEffect(() => {
     // console.log('🔍 AuthContext: Initialisation...');
@@ -46,8 +52,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Utiliser le chargement forcé pour s'assurer que les données sont bien chargées
         setTimeout(async () => {
           try {
-            const { forceLoadAllDataFromSupabase } = await import('../lib/storage');
+            const { forceLoadAllDataFromSupabase, dailyEntriesStorage } = await import('../lib/storage');
             await forceLoadAllDataFromSupabase();
+            
+            // Initialiser la synchronisation en arrière-plan des entrées en attente
+            await dailyEntriesStorage.syncPendingEntriesInBackground();
           } catch (error) {
             console.error('Erreur chargement:', error);
           }
@@ -74,10 +83,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           await sessionStorage.resetForNewUser();
         }
         
-        // Utilisateur connecté - charger les données depuis Supabase
-        // console.log('📥 Connexion détectée, chargement des données depuis Supabase...');
-        // TEMPORAIREMENT DÉSACTIVÉ POUR ÉVITER LE SPAM
-        // await loadAllDataFromSupabase();
+        // Demander l'autorisation pour les notifications lors de la première connexion
+        // (seulement si l'utilisateur n'a pas encore d'autorisation)
+        const hasPermission = await notificationService.checkPermission();
+        if (!hasPermission) {
+          console.log('🔔 Première connexion détectée, demande d\'autorisation pour les notifications...');
+          // Délai de 2 secondes pour laisser le temps à l'interface de se charger
+          setTimeout(async () => {
+            await notificationService.requestPermission();
+          }, 2000);
+        }
+        
+        // Utilisateur connecté - charger les données depuis Supabase et initialiser la sync en arrière-plan
+        console.log('📥 Connexion détectée, chargement des données depuis Supabase...');
+        setTimeout(async () => {
+          try {
+            const { forceLoadAllDataFromSupabase, dailyEntriesStorage } = await import('../lib/storage');
+            await forceLoadAllDataFromSupabase();
+            
+            // Initialiser la synchronisation en arrière-plan des entrées en attente
+            await dailyEntriesStorage.syncPendingEntriesInBackground();
+          } catch (error) {
+            console.error('Erreur chargement après connexion:', error);
+          }
+        }, 1000);
       } else if (event === 'SIGNED_OUT' || (previousUser && !session?.user)) {
         // Utilisateur déconnecté - nettoyer les données locales (chrono préservé)
         console.log('🚪 Déconnexion détectée, nettoyage des données locales');

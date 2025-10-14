@@ -49,14 +49,6 @@ export default function ProfileTab() {
     }
   };
 
-  const saveProfile = async () => {
-    try {
-      await profileStorage.set(profile);
-      Alert.alert('Succès', 'Profil sauvegardé avec succès !');
-    } catch (error) {
-      Alert.alert('Erreur', 'Impossible de sauvegarder le profil');
-    }
-  };
 
   const saveSettings = async () => {
     try {
@@ -73,9 +65,9 @@ export default function ProfileTab() {
     const yearlySavings = dailySavings * 365;
     
     return {
-      daily: dailySavings.toFixed(2),
-      monthly: monthlySavings.toFixed(2),
-      yearly: yearlySavings.toFixed(2),
+      daily: Math.round(dailySavings),
+      monthly: Math.round(monthlySavings),
+      yearly: Math.round(yearlySavings),
     };
   };
 
@@ -195,11 +187,19 @@ export default function ProfileTab() {
                   <TextInput
                     style={styles.input}
                     value={profile.smokingYears?.toString() || profile.startedSmokingYears.toString()}
-                    onChangeText={(text) => setProfile({
-                      ...profile,
-                      smokingYears: parseInt(text) || 0,
-                      startedSmokingYears: parseInt(text) || 0,
-                    })}
+                    onChangeText={async (text) => {
+                      const newProfile = {
+                        ...profile,
+                        smokingYears: parseInt(text) || 0,
+                        startedSmokingYears: parseInt(text) || 0,
+                      };
+                      setProfile(newProfile);
+                      try {
+                        await profileStorage.set(newProfile);
+                      } catch (error) {
+                        console.error('Erreur lors de la sauvegarde:', error);
+                      }
+                    }}
                     keyboardType="numeric"
                     placeholder="Ex: 5"
                     placeholderTextColor="rgba(255, 255, 255, 0.4)"
@@ -214,10 +214,18 @@ export default function ProfileTab() {
                   <TextInput
                     style={styles.input}
                     value={profile.cigsPerDay.toString()}
-                    onChangeText={(text) => setProfile({
-                      ...profile,
-                      cigsPerDay: parseInt(text) || 0,
-                    })}
+                    onChangeText={async (text) => {
+                      const newProfile = {
+                        ...profile,
+                        cigsPerDay: parseInt(text) || 0,
+                      };
+                      setProfile(newProfile);
+                      try {
+                        await profileStorage.set(newProfile);
+                      } catch (error) {
+                        console.error('Erreur lors de la sauvegarde:', error);
+                      }
+                    }}
                     keyboardType="numeric"
                     placeholder="Ex: 20"
                     placeholderTextColor="rgba(255, 255, 255, 0.4)"
@@ -247,11 +255,19 @@ export default function ProfileTab() {
                     styles.objectiveButton,
                     (profile.objectiveType === 'complete' || profile.mainGoal === 'complete_stop') && styles.objectiveButtonSelected,
                   ]}
-                  onPress={() => setProfile({ 
-                    ...profile, 
-                    objectiveType: 'complete', 
-                    mainGoal: 'complete_stop' 
-                  })}
+                  onPress={async () => {
+                    const newProfile = { 
+                      ...profile, 
+                      objectiveType: 'complete', 
+                      mainGoal: 'complete_stop' 
+                    };
+                    setProfile(newProfile);
+                    try {
+                      await profileStorage.set(newProfile);
+                    } catch (error) {
+                      console.error('Erreur lors de la sauvegarde:', error);
+                    }
+                  }}
                 >
                   <Text style={[
                     styles.objectiveButtonText,
@@ -272,11 +288,19 @@ export default function ProfileTab() {
                     styles.objectiveButton,
                     (profile.objectiveType === 'progressive' || profile.mainGoal === 'progressive_reduction') && styles.objectiveButtonSelected,
                   ]}
-                  onPress={() => setProfile({ 
-                    ...profile, 
-                    objectiveType: 'progressive', 
-                    mainGoal: 'progressive_reduction' 
-                  })}
+                  onPress={async () => {
+                    const newProfile = { 
+                      ...profile, 
+                      objectiveType: 'progressive', 
+                      mainGoal: 'progressive_reduction' 
+                    };
+                    setProfile(newProfile);
+                    try {
+                      await profileStorage.set(newProfile);
+                    } catch (error) {
+                      console.error('Erreur lors de la sauvegarde:', error);
+                    }
+                  }}
                 >
                   <Text style={[
                     styles.objectiveButtonText,
@@ -300,7 +324,15 @@ export default function ProfileTab() {
                   <TextInput
                     style={styles.dateInput}
                     value={profile.targetDate || ''}
-                    onChangeText={(text) => setProfile({ ...profile, targetDate: text })}
+                    onChangeText={async (text) => {
+                      const newProfile = { ...profile, targetDate: text };
+                      setProfile(newProfile);
+                      try {
+                        await profileStorage.set(newProfile);
+                      } catch (error) {
+                        console.error('Erreur lors de la sauvegarde:', error);
+                      }
+                    }}
                     placeholder="YYYY-MM-DD"
                     placeholderTextColor="rgba(255, 255, 255, 0.4)"
                   />
@@ -315,10 +347,18 @@ export default function ProfileTab() {
                     <TextInput
                       style={styles.input}
                       value={profile.reductionFrequency?.toString() || '1'}
-                      onChangeText={(text) => setProfile({
-                        ...profile,
-                        reductionFrequency: parseInt(text) || 1,
-                      })}
+                      onChangeText={async (text) => {
+                        const newProfile = {
+                          ...profile,
+                          reductionFrequency: parseInt(text) || 1,
+                        };
+                        setProfile(newProfile);
+                        try {
+                          await profileStorage.set(newProfile);
+                        } catch (error) {
+                          console.error('Erreur lors de la sauvegarde:', error);
+                        }
+                      }}
                       keyboardType="numeric"
                       placeholder="1"
                       placeholderTextColor="rgba(255, 255, 255, 0.4)"
@@ -365,52 +405,7 @@ export default function ProfileTab() {
               </Text>
             </View>
 
-            {/* Paramètres */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIcon}>⚙️</Text>
-                <Text style={styles.cardTitle}>Paramètres</Text>
-              </View>
-              
-              <View style={styles.settingRow}>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel}>Notifications quotidiennes</Text>
-                  <Text style={styles.settingDescription}>Rappels pour saisir votre consommation</Text>
-                </View>
-                <Switch
-                  value={settings.notificationsAllowed}
-                  onValueChange={(value) => setSettings({
-                    ...settings,
-                    notificationsAllowed: value,
-                  })}
-                  trackColor={{ false: '#64748B', true: '#8B45FF' }}
-                  thumbColor={settings.notificationsAllowed ? '#F8FAFC' : '#F8FAFC'}
-                />
-              </View>
 
-              <View style={styles.settingRow}>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel}>Animations</Text>
-                  <Text style={styles.settingDescription}>Effets visuels dans l'app</Text>
-                </View>
-                <Switch
-                  value={settings.animationsEnabled}
-                  onValueChange={(value) => setSettings({
-                    ...settings,
-                    animationsEnabled: value,
-                  })}
-                  trackColor={{ false: '#64748B', true: '#8B45FF' }}
-                  thumbColor={settings.animationsEnabled ? '#F8FAFC' : '#F8FAFC'}
-                />
-              </View>
-            </View>
-
-            {/* Boutons de sauvegarde */}
-            <View style={styles.actionsContainer}>
-              <TouchableOpacity style={styles.saveButton} onPress={saveProfile}>
-                <Text style={styles.saveButtonText}>💾 Sauvegarder mon profil</Text>
-              </TouchableOpacity>
-            </View>
 
           </View>
         </ScrollView>
@@ -605,16 +600,17 @@ const styles = StyleSheet.create({
   savingsItem: {
     backgroundColor: 'rgba(16, 185, 129, 0.2)',
     borderRadius: 16,
-    padding: 20,
+    padding: 16,
     alignItems: 'center',
     flex: 1,
-    marginHorizontal: 4,
+    marginHorizontal: 2,
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.3)',
+    minWidth: 100,
   },
   savingsAmount: {
     color: '#10B981',
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 5,
   },
@@ -628,48 +624,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     fontStyle: 'italic',
-  },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-    paddingVertical: 10,
-  },
-  settingInfo: {
-    flex: 1,
-    marginRight: 15,
-  },
-  settingLabel: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  settingDescription: {
-    color: '#94A3B8',
-    fontSize: 14,
-  },
-  actionsContainer: {
-    marginTop: 20,
-  },
-  saveButton: {
-    backgroundColor: 'rgba(139, 69, 255, 0.8)',
-    borderRadius: 16,
-    paddingVertical: 18,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(139, 69, 255, 0.5)',
-    shadowColor: '#8B45FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  saveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
   },
   starryBackground: {
     position: 'absolute',

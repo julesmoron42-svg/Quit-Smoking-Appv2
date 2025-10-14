@@ -16,7 +16,12 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.myquitzone.app"
+      "bundleIdentifier": "com.myquitzone.app",
+      "buildNumber": "1",
+      "deploymentTarget": "13.4",
+      "infoPlist": {
+        "NSUserNotificationsUsageDescription": "Cette application envoie des notifications pour vous rappeler vos objectifs d'arrêt du tabac."
+      }
     },
     "android": {
       "adaptiveIcon": {

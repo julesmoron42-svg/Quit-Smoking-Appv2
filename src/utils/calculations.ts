@@ -381,7 +381,8 @@ export const generateCigarettesChartData = (
   const realData: number[] = [];
   const labels: string[] = [];
   
-  // Trouver la première entrée pour commencer le graphique
+  
+  // Trouver les dates disponibles
   const sortedDates = Object.keys(dailyEntries).sort();
   if (sortedDates.length === 0) {
     // Pas de données, retourner des données vides
@@ -390,7 +391,7 @@ export const generateCigarettesChartData = (
       datasets: [
         {
           data: [profile.cigsPerDay],
-          color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
+          color: (opacity = 1) => `rgba(139, 69, 255, ${opacity})`,
           strokeWidth: 2,
           strokeDashArray: [5, 5],
         },
@@ -403,20 +404,44 @@ export const generateCigarettesChartData = (
     };
   }
   
-  const startDate = new Date(sortedDates[0]);
+  // Déterminer la période à afficher
+  let startDate: Date;
+  let actualDaysToShow: number;
   
-  // Générer exactement 30 jours depuis le premier jour d'entrée
-  for (let i = 0; i < daysToShow; i++) {
+  if (daysToShow <= 30) {
+    // Pour 1M : utiliser les 30 derniers jours
+    const lastDate = new Date(sortedDates[sortedDates.length - 1]);
+    startDate = new Date(lastDate);
+    startDate.setDate(startDate.getDate() - (daysToShow - 1));
+    actualDaysToShow = daysToShow;
+  } else {
+    // Pour 6M, 1Y, 10Y : commencer au premier jour d'entrée et afficher la période demandée
+    startDate = new Date(sortedDates[0]);
+    actualDaysToShow = daysToShow;
+  }
+  
+  // Générer les données pour la période déterminée
+  for (let i = 0; i < actualDaysToShow; i++) {
     const date = new Date(startDate);
     date.setDate(date.getDate() + i);
     const dateString = date.toISOString().split('T')[0];
     
-    // Calcul théorique (projection de réduction)
-    const theoreticalCigs = getProgressiveGoal(profile, i, daysToShow, startDate);
+    // Récupérer l'entrée pour ce jour
+    const entry = dailyEntries[dateString];
+    
+    // Utiliser l'objectif réel de l'entrée si elle existe, sinon calculer théoriquement
+    let theoreticalCigs;
+    if (entry && entry.goalCigs !== undefined) {
+      // Utiliser l'objectif réel stocké dans la base de données
+      theoreticalCigs = entry.goalCigs;
+    } else {
+      // Calculer l'objectif théorique basé sur le nombre d'entrées jusqu'à ce jour
+      const entriesUpToThisDay = Object.keys(dailyEntries).filter(entryDate => entryDate <= dateString).length;
+      theoreticalCigs = getProgressiveGoal(profile, entriesUpToThisDay);
+    }
     theoreticalData.push(theoreticalCigs);
     
     // Données réelles
-    const entry = dailyEntries[dateString];
     realData.push(entry ? entry.realCigs : 0);
     
     // Labels au format DD/MM (afficher seulement tous les 5 jours pour éviter la surcharge)
@@ -429,12 +454,13 @@ export const generateCigarettesChartData = (
     }
   }
   
+  
   return {
     labels,
     datasets: [
       {
         data: theoreticalData,
-        color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`, // Bleu pour théorique
+        color: (opacity = 1) => `rgba(139, 69, 255, ${opacity})`, // Bleu pour théorique
         strokeWidth: 2,
         strokeDashArray: [5, 5], // Ligne pointillée
       },
@@ -458,7 +484,7 @@ export const generateSavingsChartData = (
   const realData: number[] = [];
   const labels: string[] = [];
   
-  // Trouver la première entrée pour commencer le graphique
+  // Trouver les dates disponibles
   const sortedDates = Object.keys(dailyEntries).sort();
   if (sortedDates.length === 0) {
     // Pas de données, retourner des données vides
@@ -467,7 +493,7 @@ export const generateSavingsChartData = (
       datasets: [
         {
           data: [0],
-          color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
+          color: (opacity = 1) => `rgba(139, 69, 255, ${opacity})`,
           strokeWidth: 2,
           strokeDashArray: [5, 5],
         },
@@ -480,25 +506,49 @@ export const generateSavingsChartData = (
     };
   }
   
-  const startDate = new Date(sortedDates[0]);
+  // Déterminer la période à afficher
+  let startDate: Date;
+  let actualDaysToShow: number;
+  
+  if (daysToShow <= 30) {
+    // Pour 1M : utiliser les 30 derniers jours
+    const lastDate = new Date(sortedDates[sortedDates.length - 1]);
+    startDate = new Date(lastDate);
+    startDate.setDate(startDate.getDate() - (daysToShow - 1));
+    actualDaysToShow = daysToShow;
+  } else {
+    // Pour 6M, 1Y, 10Y : commencer au premier jour d'entrée et afficher la période demandée
+    startDate = new Date(sortedDates[0]);
+    actualDaysToShow = daysToShow;
+  }
   
   let theoreticalCumulative = 0;
   let realCumulative = 0;
   
-  // Générer exactement 30 jours depuis le premier jour d'entrée
-  for (let i = 0; i < daysToShow; i++) {
+  // Générer les données pour la période déterminée
+  for (let i = 0; i < actualDaysToShow; i++) {
     const date = new Date(startDate);
     date.setDate(date.getDate() + i);
     const dateString = date.toISOString().split('T')[0];
     
-    // Calcul théorique cumulatif
-    const theoreticalCigs = getProgressiveGoal(profile, i, daysToShow, startDate);
+    // Récupérer l'entrée pour ce jour
+    const entry = dailyEntries[dateString];
+    
+    // Utiliser l'objectif réel de l'entrée si elle existe, sinon calculer théoriquement
+    let theoreticalCigs;
+    if (entry && entry.goalCigs !== undefined) {
+      // Utiliser l'objectif réel stocké dans la base de données
+      theoreticalCigs = entry.goalCigs;
+    } else {
+      // Calculer l'objectif théorique basé sur le nombre d'entrées jusqu'à ce jour
+      const entriesUpToThisDay = Object.keys(dailyEntries).filter(entryDate => entryDate <= dateString).length;
+      theoreticalCigs = getProgressiveGoal(profile, entriesUpToThisDay);
+    }
     const dailyTheoreticalSavings = Math.max(0, profile.cigsPerDay - theoreticalCigs) * pricePerCig;
     theoreticalCumulative += dailyTheoreticalSavings;
     theoreticalData.push(theoreticalCumulative);
     
     // Données réelles cumulatives
-    const entry = dailyEntries[dateString];
     if (entry) {
       const dailyRealSavings = Math.max(0, profile.cigsPerDay - entry.realCigs) * pricePerCig;
       realCumulative += dailyRealSavings;
@@ -520,7 +570,7 @@ export const generateSavingsChartData = (
     datasets: [
       {
         data: theoreticalData,
-        color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`, // Bleu pour théorique
+        color: (opacity = 1) => `rgba(139, 69, 255, ${opacity})`, // Bleu pour théorique
         strokeWidth: 2,
         strokeDashArray: [5, 5], // Ligne pointillée
       },

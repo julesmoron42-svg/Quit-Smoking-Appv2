@@ -31,7 +31,7 @@ const { width } = Dimensions.get('window');
 const Tab = createMaterialTopTabNavigator();
 
 // Fonction pour créer un graphique SVG simple
-const createSimpleChart = (data: any, width: number, height: number, period: string = '1M', onTouch?: (x: number, values: any) => void) => {
+const createSimpleChart = (data: any, width: number, height: number, period: string = '1M', dailyEntries: Record<string, any> = {}, onTouch?: (x: number, values: any) => void) => {
   const chartWidth = width - 40;
   const chartHeight = height - 40;
   const paddingLeft = 40;
@@ -100,7 +100,7 @@ const createSimpleChart = (data: any, width: number, height: number, period: str
   const lines = data.datasets
     .filter((dataset: any) => dataset.data && dataset.data.length > 0)
     .map((dataset: any, index: number) => {
-      const color = index === 0 ? '#3B82F6' : '#10B981';
+      const color = index === 0 ? '#8B45FF' : '#10B981';
       const coords = getCoordinates(dataset, color);
       const strokeDasharray = index === 0 ? '5,5' : '0';
       
@@ -148,18 +148,25 @@ const createSimpleChart = (data: any, width: number, height: number, period: str
   if (data.datasets[0] && data.datasets[0].data) {
     const dataLength = data.datasets[0].data.length;
     
-    // Calculer la date de début basée sur la période et la première entrée
+    // Calculer la date de début basée sur la période et les données réelles
     const getStartDate = () => {
-      const today = new Date();
       const daysForPeriod = getDaysForPeriod(period);
       
       if (period === '1M') {
         // Pour 1M, commencer depuis aujourd'hui - 30 jours
+        const today = new Date();
         return new Date(today.getTime() - (daysForPeriod - 1) * 24 * 60 * 60 * 1000);
       } else {
-        // Pour 6M, 1Y, 10Y, commencer depuis la première entrée (septembre 2025)
-        const firstEntryDate = new Date('2025-09-01');
-        return firstEntryDate;
+        // Pour 6M, 1Y, 10Y, commencer depuis la première entrée réelle
+        if (data.datasets[0] && data.datasets[0].data && data.datasets[0].data.length > 0) {
+          // Utiliser la première date des données du graphique
+          const sortedDates = Object.keys(dailyEntries).sort();
+          if (sortedDates.length > 0) {
+            return new Date(sortedDates[0]);
+          }
+        }
+        // Fallback si pas d'entrées
+        return new Date('2025-09-01');
       }
     };
     
@@ -238,8 +245,8 @@ const createSimpleChart = (data: any, width: number, height: number, period: str
     <Svg width={chartWidth} height={chartHeight}>
       <Defs>
         <SvgLinearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-          <Stop offset="0%" stopColor="rgba(59, 130, 246, 0.1)" />
-          <Stop offset="100%" stopColor="rgba(59, 130, 246, 0.05)" />
+          <Stop offset="0%" stopColor="rgba(139, 69, 255, 0.1)" />
+          <Stop offset="100%" stopColor="rgba(139, 69, 255, 0.05)" />
         </SvgLinearGradient>
       </Defs>
       {axes}
@@ -277,8 +284,10 @@ function CigarettesScreen() {
   const loadData = async () => {
     const [profileData, entriesData] = await Promise.all([
       profileStorage.get(),
-      dailyEntriesStorage.get(),
+      dailyEntriesStorage.refresh(), // Utiliser refresh() pour avoir les données les plus récentes
     ]);
+    
+    
     setProfile(profileData);
     setDailyEntries(entriesData);
   };
@@ -418,10 +427,16 @@ function CigarettesScreen() {
                       const startDate = new Date(today.getTime() - (daysForPeriod - 1) * 24 * 60 * 60 * 1000);
                       return new Date(startDate.getTime() + index * 24 * 60 * 60 * 1000);
                     } else {
-                      // Pour 6M, 1Y, 10Y, commencer depuis la première entrée (septembre 2025)
-                      const firstEntryDate = new Date('2025-09-01');
-                      const daysPerPoint = daysForPeriod / chartData.datasets[0]?.data.length;
-                      return new Date(firstEntryDate.getTime() + Math.round(index * daysPerPoint) * 24 * 60 * 60 * 1000);
+                      // Pour 6M, 1Y, 10Y, commencer depuis la première entrée réelle
+                      const sortedDates = Object.keys(dailyEntries).sort();
+                      if (sortedDates.length > 0) {
+                        const firstEntryDate = new Date(sortedDates[0]);
+                        return new Date(firstEntryDate.getTime() + index * 24 * 60 * 60 * 1000);
+                      } else {
+                        // Fallback si pas d'entrées
+                        const firstEntryDate = new Date('2025-09-01');
+                        return new Date(firstEntryDate.getTime() + index * 24 * 60 * 60 * 1000);
+                      }
                     }
                   };
                   
@@ -434,7 +449,7 @@ function CigarettesScreen() {
                 }
               }}
             >
-              {createSimpleChart(chartData, width, 300, selectedPeriod)}
+              {createSimpleChart(chartData, width, 300, selectedPeriod, dailyEntries)}
               
               {/* Curseur vertical */}
               {cursorPosition && (
@@ -453,7 +468,7 @@ function CigarettesScreen() {
                     : cursorPosition.values.date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
                   }
                 </Text>
-                <Text style={{ color: '#3B82F6', fontSize: 11, textAlign: 'center', marginBottom: 2 }}>
+                <Text style={{ color: '#8B45FF', fontSize: 11, textAlign: 'center', marginBottom: 2 }}>
                   Objectif: {Math.round(cursorPosition.values.theoretical)}
                 </Text>
                 <Text style={{ color: '#10B981', fontSize: 11, textAlign: 'center' }}>
@@ -472,7 +487,7 @@ function CigarettesScreen() {
                       y1={1.5}
                       x2={20}
                       y2={1.5}
-                      stroke="#3B82F6"
+                      stroke="#8B45FF"
                       strokeWidth={2}
                       strokeDasharray="3,3"
                     />
@@ -528,7 +543,7 @@ function SavingsScreen() {
     const [profileData, settingsData, entriesData] = await Promise.all([
       profileStorage.get(),
       settingsStorage.get(),
-      dailyEntriesStorage.get(),
+      dailyEntriesStorage.refresh(), // Utiliser refresh() pour avoir les données les plus récentes
     ]);
     setProfile(profileData);
     setSettings(settingsData);
@@ -630,37 +645,37 @@ function SavingsScreen() {
           })}
         </View>
         
-        <TouchableWithoutFeedback onPress={() => cursorPosition && setCursorPosition(null)}>
-          <View style={styles.container}>
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-              <Text style={styles.screenTitle}>💰 Économies</Text>
-          <Text style={styles.screenDescription}>
-            Évolution cumulative de vos économies
-          </Text>
-          
-          {/* Sélecteur de période */}
-          <View style={styles.periodSelector}>
-            {['1M', '6M', '1Y', '10Y'].map((period) => (
-              <TouchableOpacity
-                key={period}
-                style={[
-                  styles.periodButton,
-                  selectedPeriod === period && styles.periodButtonActive
-                ]}
-                onPress={() => setSelectedPeriod(period)}
-              >
-                <Text style={[
-                  styles.periodButtonText,
-                  selectedPeriod === period && styles.periodButtonTextActive
-                ]}>
-                  {period}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          
-          {/* Graphique */}
-          <View style={styles.chartWrapper}>
+        <View style={styles.container}>
+          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+            <Text style={styles.screenTitle}>💰 Économies</Text>
+            <Text style={styles.screenDescription}>
+              Évolution cumulative de vos économies
+            </Text>
+            
+            {/* Sélecteur de période */}
+            <View style={styles.periodSelector}>
+              {['1M', '6M', '1Y', '10Y'].map((period) => (
+                <TouchableOpacity
+                  key={period}
+                  style={[
+                    styles.periodButton,
+                    selectedPeriod === period && styles.periodButtonActive
+                  ]}
+                  onPress={() => setSelectedPeriod(period)}
+                >
+                  <Text style={[
+                    styles.periodButtonText,
+                    selectedPeriod === period && styles.periodButtonTextActive
+                  ]}>
+                    {period}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            {/* Graphique */}
+            <TouchableWithoutFeedback onPress={() => cursorPosition && setCursorPosition(null)}>
+              <View style={styles.chartWrapper}>
             <TouchableOpacity 
               style={styles.chartContainer}
               activeOpacity={1}
@@ -682,10 +697,16 @@ function SavingsScreen() {
                       const startDate = new Date(today.getTime() - (daysForPeriod - 1) * 24 * 60 * 60 * 1000);
                       return new Date(startDate.getTime() + index * 24 * 60 * 60 * 1000);
                     } else {
-                      // Pour 6M, 1Y, 10Y, commencer depuis la première entrée (septembre 2025)
-                      const firstEntryDate = new Date('2025-09-01');
-                      const daysPerPoint = daysForPeriod / chartData.datasets[0]?.data.length;
-                      return new Date(firstEntryDate.getTime() + Math.round(index * daysPerPoint) * 24 * 60 * 60 * 1000);
+                      // Pour 6M, 1Y, 10Y, commencer depuis la première entrée réelle
+                      const sortedDates = Object.keys(dailyEntries).sort();
+                      if (sortedDates.length > 0) {
+                        const firstEntryDate = new Date(sortedDates[0]);
+                        return new Date(firstEntryDate.getTime() + index * 24 * 60 * 60 * 1000);
+                      } else {
+                        // Fallback si pas d'entrées
+                        const firstEntryDate = new Date('2025-09-01');
+                        return new Date(firstEntryDate.getTime() + index * 24 * 60 * 60 * 1000);
+                      }
                     }
                   };
                   
@@ -698,7 +719,7 @@ function SavingsScreen() {
                 }
               }}
             >
-              {createSimpleChart(chartData, width, 300, selectedPeriod)}
+              {createSimpleChart(chartData, width, 300, selectedPeriod, dailyEntries)}
               
               {/* Curseur vertical */}
               {cursorPosition && (
@@ -717,7 +738,7 @@ function SavingsScreen() {
                     : cursorPosition.values.date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
                   }
                 </Text>
-                <Text style={{ color: '#3B82F6', fontSize: 11, textAlign: 'center', marginBottom: 2 }}>
+                <Text style={{ color: '#8B45FF', fontSize: 11, textAlign: 'center', marginBottom: 2 }}>
                   Objectif: {Math.round(cursorPosition.values.theoretical)}€
                 </Text>
                 <Text style={{ color: '#10B981', fontSize: 11, textAlign: 'center' }}>
@@ -735,7 +756,7 @@ function SavingsScreen() {
                     y1={1.5}
                     x2={20}
                     y2={1.5}
-                    stroke="#3B82F6"
+                    stroke="#8B45FF"
                     strokeWidth={2}
                     strokeDasharray="3,3"
                   />
@@ -748,6 +769,7 @@ function SavingsScreen() {
               </View>
             </View>
           </View>
+            </TouchableWithoutFeedback>
 
           {/* Résumé des économies */}
           <View style={styles.summaryContainer}>
@@ -771,8 +793,7 @@ function SavingsScreen() {
             </View>
           </View>
         </ScrollView>
-          </View>
-        </TouchableWithoutFeedback>
+        </View>
       </LinearGradient>
     </View>
   );
@@ -993,7 +1014,7 @@ function GoalsScreen() {
       const [goalsData, profileData, entriesData, settingsData] = await Promise.all([
         goalsStorage.get(),
         profileStorage.get(),
-        dailyEntriesStorage.get(),
+        dailyEntriesStorage.refresh(), // Utiliser refresh() pour avoir les données les plus récentes
         settingsStorage.get()
       ]);
       
@@ -1258,10 +1279,10 @@ export default function AnalyticsTab({ route }: any) {
           borderTopColor: '#1E293B',
           borderTopWidth: 1,
         },
-        tabBarActiveTintColor: '#3B82F6',
+        tabBarActiveTintColor: '#8B45FF',
         tabBarInactiveTintColor: '#64748B',
         tabBarIndicatorStyle: {
-          backgroundColor: '#3B82F6',
+          backgroundColor: '#8B45FF',
         },
         tabBarLabelStyle: {
           fontSize: 12,
@@ -1330,8 +1351,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   periodButtonActive: {
-    backgroundColor: '#3B82F6',
-    borderColor: '#3B82F6',
+    backgroundColor: '#8B45FF',
+    borderColor: '#8B45FF',
   },
   periodButtonText: {
     color: '#94A3B8',
@@ -1425,7 +1446,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   entryGoal: {
-    color: '#3B82F6',
+    color: '#8B45FF',
     fontSize: 14,
   },
   summaryContainer: {
@@ -1467,7 +1488,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   statValue: {
-    color: '#3B82F6',
+    color: '#8B45FF',
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 5,
@@ -1525,7 +1546,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#8B45FF',
     borderRadius: 4,
   },
   progressFillCompleted: {
@@ -1568,15 +1589,15 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sourceLink: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    backgroundColor: 'rgba(139, 69, 255, 0.2)',
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
+    borderColor: 'rgba(139, 69, 255, 0.3)',
   },
   sourceLinkText: {
-    color: '#3B82F6',
+    color: '#8B45FF',
     fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
@@ -1607,12 +1628,12 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   addButton: {
-    backgroundColor: 'rgba(59, 130, 246, 0.8)',
+    backgroundColor: 'rgba(139, 69, 255, 0.8)',
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
+    borderColor: 'rgba(139, 69, 255, 0.3)',
   },
   addButtonText: {
     color: '#F8FAFC',
@@ -1649,7 +1670,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   goalPrice: {
-    color: '#3B82F6',
+    color: '#8B45FF',
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
@@ -1663,7 +1684,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#8B45FF',
     borderRadius: 3,
   },
   progressText: {
@@ -1755,17 +1776,17 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   popupCloseButton: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    backgroundColor: 'rgba(139, 69, 255, 0.2)',
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 16,
     marginTop: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
+    borderColor: 'rgba(139, 69, 255, 0.3)',
   },
   popupCloseText: {
-    color: '#60a5fa',
+    color: '#8B45FF',
     fontSize: 14,
     fontWeight: '500',
   },
@@ -1858,14 +1879,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   addButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#8B45FF',
     borderRadius: 8,
     padding: 14,
     alignItems: 'center',
     marginTop: 8,
   },
   addButtonDisabled: {
-    backgroundColor: 'rgba(59, 130, 246, 0.3)',
+    backgroundColor: 'rgba(139, 69, 255, 0.3)',
   },
   addButtonText: {
     color: '#FFFFFF',
@@ -1900,7 +1921,7 @@ const styles = StyleSheet.create({
     color: '#22C55E',
   },
   goalPrice: {
-    color: '#3B82F6',
+    color: '#8B45FF',
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
@@ -1916,7 +1937,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#8B45FF',
     height: '100%',
     borderRadius: 4,
   },

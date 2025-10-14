@@ -11,6 +11,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { sessionStorage, dailyEntriesStorage, streakStorage, profileStorage, settingsStorage } from '../lib/storage';
+import { notificationService } from '../lib/notificationService';
 import { 
   formatTime, 
   getBallColor, 
@@ -32,7 +33,12 @@ import OnboardingModal, { OnboardingData } from '../components/OnboardingModal';
 
 const { width } = Dimensions.get('window');
 
-export default function MainTab() {
+interface MainTabProps {
+  shouldOpenDailyEntry?: boolean;
+  onDailyEntryClosed?: () => void;
+}
+
+export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClosed }: MainTabProps) {
   const navigation = useNavigation() as any;
   const [session, setSession] = useState<TimerSession>({
     isRunning: false,
@@ -59,6 +65,7 @@ export default function MainTab() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const [onboardingVisible, setOnboardingVisible] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
 
   useEffect(() => {
@@ -80,6 +87,20 @@ export default function MainTab() {
       setOnboardingVisible(false);
     }
   }, [profile.onboardingCompleted, dailyEntries]);
+
+  // Gérer l'ouverture de l'overlay depuis une notification
+  useEffect(() => {
+    if (shouldOpenDailyEntry) {
+      console.log('🔔 Ouverture de l\'overlay de saisie quotidienne depuis la notification');
+      const today = new Date().toISOString().split('T')[0];
+      setSelectedDate(today);
+      setModalVisible(true);
+      // Notifier le composant parent que l'overlay a été ouvert
+      if (onDailyEntryClosed) {
+        onDailyEntryClosed();
+      }
+    }
+  }, [shouldOpenDailyEntry, onDailyEntryClosed]);
 
   // Pas de reset automatique du streak au chargement
   // Le streak est géré uniquement lors de la saisie des entrées quotidiennes
@@ -268,7 +289,11 @@ export default function MainTab() {
     try {
       const newEntries = { ...dailyEntries, [entry.date]: entry };
       setDailyEntries(newEntries);
-      await dailyEntriesStorage.set(newEntries);
+      
+      // Utiliser la méthode optimisée addEntry qui synchronise immédiatement la nouvelle entrée
+      setIsSyncing(true);
+      await dailyEntriesStorage.addEntry(entry.date, entry);
+      setIsSyncing(false);
       
       // Recalculer le streak basé sur les connexions (entrées quotidiennes)
       const connectionStreak = calculateConnectionStreak(newEntries, entry.date);
@@ -348,6 +373,7 @@ export default function MainTab() {
     }
   };
 
+
   const getSevenDaysData = () => {
     const days = [];
     
@@ -362,15 +388,17 @@ export default function MainTab() {
       const entry = dailyEntries[dateString];
       
       // Pour l'objectif, on peut utiliser l'objectif de l'entrée si elle existe,
-      // sinon calculer un objectif progressif basé sur le nombre de jours depuis le début
+      // sinon calculer un objectif progressif basé sur le nombre d'entrées jusqu'à ce jour
       let goalCigs;
       if (entry && entry.goalCigs !== undefined) {
         goalCigs = entry.goalCigs;
       } else {
-        // Calculer l'objectif progressif basé sur le profil
+        // Calculer l'objectif progressif basé sur le nombre d'entrées jusqu'à ce jour
+        // Cela garantit la cohérence avec le graphique
+        const entriesUpToThisDay = Object.keys(dailyEntries).filter(entryDate => entryDate <= dateString).length;
         goalCigs = profile.objectiveType === 'complete' 
           ? 0 
-          : getProgressiveGoal(profile, Object.keys(dailyEntries).length);
+          : getProgressiveGoal(profile, entriesUpToThisDay);
       }
       
       days.push({
@@ -575,6 +603,12 @@ export default function MainTab() {
                 <Text style={styles.secondsText}>{timeDisplay.seconds}</Text>
               </TouchableOpacity>
             </View>
+            {/* Indicateur de synchronisation */}
+            {isSyncing && (
+              <View style={styles.syncIndicator}>
+                <Text style={styles.syncText}>🔄 Synchronisation...</Text>
+              </View>
+            )}
           </View>
 
           {/* Boutons d'action */}
@@ -606,6 +640,7 @@ export default function MainTab() {
 
           </View>
 
+
           {/* Graine évolutive */}
           <View style={styles.seedContainer}>
             <Text style={styles.sectionTitle}>🌱 Ton arbre de progression</Text>
@@ -628,12 +663,19 @@ export default function MainTab() {
                 {Math.round(seedProgress * 100)}% vers l'arbre complet
               </Text>
             </View>
+            
+            {/* Texte explicatif */}
+            <View style={styles.seedExplanationContainer}>
+              <Text style={styles.seedExplanationText}>
+                💡 Pour faire évoluer ta plante, viens chaque jour entrer tes saisies quotidiennes. Un jour manqué fera redémarrer ta progression !
+              </Text>
+            </View>
           </View>
 
           {/* Statistiques */}
           <View style={styles.statsContainer}>
             <View style={styles.statCard}>
-              <Text style={styles.statIcon}>🚫</Text>
+              <Text style={styles.statIcon}>🚬</Text>
               <Text style={[styles.statNumber, { color: '#FF6B6B' }]}>
                 {cigarettesAvoided}
               </Text>
@@ -644,7 +686,7 @@ export default function MainTab() {
             </View>
             
             <View style={styles.statCard}>
-              <Text style={styles.statIcon}>{settings.currency}</Text>
+              <Text style={styles.statIcon}>💰</Text>
               <Text style={[styles.statNumber, { color: '#51CF66' }]}>
                 {moneySaved.toFixed(1)}
               </Text>
@@ -655,8 +697,8 @@ export default function MainTab() {
             </View>
             
             <View style={styles.statCard}>
-              <Text style={styles.statIcon}>📅</Text>
-              <Text style={[styles.statNumber, { color: '#339AF0' }]}>
+              <Text style={styles.statIcon}>🌱</Text>
+              <Text style={[styles.statNumber, { color: '#7C3AED' }]}>
                 {streak.currentStreak}
               </Text>
               <Text style={styles.statLabel}>Jours de croissance</Text>
@@ -1129,7 +1171,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   healthGoalPercentage: {
-    color: '#3B82F6',
+    color: '#8B45FF',
     fontSize: 14,
     fontWeight: 'bold',
   },
@@ -1148,7 +1190,7 @@ const styles = StyleSheet.create({
   },
   healthProgressFill: {
     height: '100%',
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#8B45FF',
     borderRadius: 3,
   },
   healthGoalTimeRemaining: {
@@ -1251,5 +1293,28 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 12,
     textAlign: 'center',
+  },
+  seedExplanationContainer: {
+    marginTop: 15,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 8,
+    paddingVertical: 12,
+  },
+  seedExplanationText: {
+    color: '#E2E8F0',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    fontStyle: 'italic',
+  },
+  syncIndicator: {
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  syncText: {
+    color: '#8B45FF',
+    fontSize: 12,
+    fontStyle: 'italic',
   },
 });

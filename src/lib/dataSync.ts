@@ -158,26 +158,91 @@ export class DataSyncService {
     }
   }
 
-  // Synchroniser les entrées quotidiennes
-  static async syncDailyEntries(userId: string, entries: Record<string, DailyEntry>) {
+  // Synchroniser une seule entrée quotidienne (optimisé)
+  static async syncSingleDailyEntry(userId: string, date: string, entry: DailyEntry) {
     try {
-      const entriesArray = Object.entries(entries).map(([date, entry]) => ({
-        user_id: userId, // userId est maintenant l'email
+      const entryData = {
+        user_id: userId,
         date,
         real_cigs: entry.realCigs,
         goal_cigs: entry.goalCigs,
         emotion: entry.emotion,
         objective_met: entry.objectiveMet,
         updated_at: new Date().toISOString(),
-      }));
+      };
 
+      // Essayer d'abord un upsert avec gestion de conflit
       const { data, error } = await supabase
         .from('daily_entries')
-        .upsert(entriesArray)
-        .select();
+        .upsert(entryData, { 
+          onConflict: 'user_id,date',
+          ignoreDuplicates: false 
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
-      return { data, error: null };
+      if (error) {
+        console.warn(`⚠️ Erreur upsert pour ${date}:`, error.message);
+        
+        // Si upsert échoue, essayer une mise à jour directe
+        const { data: updateData, error: updateError } = await supabase
+          .from('daily_entries')
+          .update({
+            real_cigs: entryData.real_cigs,
+            goal_cigs: entryData.goal_cigs,
+            emotion: entryData.emotion,
+            objective_met: entryData.objective_met,
+            updated_at: entryData.updated_at,
+          })
+          .eq('user_id', userId)
+          .eq('date', date)
+          .select()
+          .single();
+
+        if (updateError) {
+          console.error(`❌ Erreur mise à jour pour ${date}:`, updateError);
+          // Si la mise à jour échoue aussi, essayer une insertion
+          const { data: insertData, error: insertError } = await supabase
+            .from('daily_entries')
+            .insert(entryData)
+            .select()
+            .single();
+          
+          if (insertError) {
+            console.error(`❌ Erreur insertion pour ${date}:`, insertError);
+            return { data: null, error: insertError };
+          } else {
+            console.log(`✅ Entrée insérée pour ${date}`);
+            return { data: insertData, error: null };
+          }
+        } else {
+          console.log(`✅ Entrée mise à jour pour ${date}`);
+          return { data: updateData, error: null };
+        }
+      } else {
+        console.log(`✅ Entrée synchronisée pour ${date}`);
+        return { data, error: null };
+      }
+    } catch (error) {
+      console.error(`❌ Erreur de synchronisation pour ${date}:`, error);
+      return { data: null, error };
+    }
+  }
+
+  // Synchroniser les entrées quotidiennes (version optimisée)
+  static async syncDailyEntries(userId: string, entries: Record<string, DailyEntry>) {
+    try {
+      // Traiter chaque entrée individuellement pour éviter les conflits
+      const results = [];
+      
+      for (const [date, entry] of Object.entries(entries)) {
+        const result = await this.syncSingleDailyEntry(userId, date, entry);
+        if (result.data) {
+          results.push(result.data);
+        }
+      }
+
+      return { data: results, error: null };
     } catch (error) {
       console.error('Erreur lors de la synchronisation des entrées:', error);
       return { data: null, error };

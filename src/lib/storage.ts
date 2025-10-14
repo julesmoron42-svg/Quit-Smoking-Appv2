@@ -21,6 +21,8 @@ const STORAGE_KEYS = {
   STREAK: '@MyQuitZone:streak',
   GOALS: '@MyQuitZone:goals',
   ACHIEVEMENTS: '@MyQuitZone:achievements',
+  SYNCED_ENTRIES: '@MyQuitZone:syncedEntries', // Nouvelles entrées synchronisées
+  PENDING_SYNC: '@MyQuitZone:pendingSync', // Entrées en attente de synchronisation
 } as const;
 
 // Valeurs par défaut
@@ -322,6 +324,8 @@ export const dailyEntriesStorage = {
             console.log('📥 Entrées chargées depuis Supabase:', Object.keys(remoteEntries).length, 'entrées');
             // Sauvegarder localement pour éviter de recharger à chaque fois
             await storage.set(STORAGE_KEYS.DAILY_ENTRIES, remoteEntries);
+            // Marquer toutes les entrées comme synchronisées
+            await storage.set(STORAGE_KEYS.SYNCED_ENTRIES, Object.keys(remoteEntries));
             return remoteEntries;
           }
         } catch (error) {
@@ -334,30 +338,170 @@ export const dailyEntriesStorage = {
   },
 
   async set(entries: Record<string, DailyEntry>): Promise<void> {
+    // Sauvegarder localement d'abord (instantané)
     await storage.set(STORAGE_KEYS.DAILY_ENTRIES, entries);
     
-    // Synchroniser avec Supabase
+    // Marquer les entrées comme en attente de synchronisation
+    const pendingDates = Object.keys(entries);
+    await storage.set(STORAGE_KEYS.PENDING_SYNC, pendingDates);
+    
+    // Synchroniser en arrière-plan (non bloquant)
+    this.syncPendingEntriesInBackground();
+  },
+
+  // Méthode optimisée pour ajouter une seule entrée
+  async addEntry(date: string, entry: DailyEntry): Promise<void> {
+    const entries = await this.get();
+    entries[date] = entry;
+    
+    // Sauvegarder localement immédiatement
+    await storage.set(STORAGE_KEYS.DAILY_ENTRIES, entries);
+    
+    // Synchroniser immédiatement cette nouvelle entrée
     const userId = await getCurrentUserId();
     if (userId) {
-      console.log('💾 Sauvegarde des entrées vers Supabase...', Object.keys(entries).length, 'entrées');
       try {
+        console.log(`💾 Synchronisation immédiate de l'entrée ${date}...`);
         const { DataSyncService } = require('./dataSync');
-        const result = await DataSyncService.syncDailyEntries(userId, entries);
+        const result = await DataSyncService.syncSingleDailyEntry(userId, date, entry);
         if (result.error) {
-          console.error('❌ Erreur sauvegarde entrées:', result.error);
+          console.error(`❌ Erreur synchronisation immédiate pour ${date}:`, result.error);
+          // Ajouter à la liste des entrées en attente
+          const pendingDates = await storage.get(STORAGE_KEYS.PENDING_SYNC, []);
+          if (!pendingDates.includes(date)) {
+            pendingDates.push(date);
+            await storage.set(STORAGE_KEYS.PENDING_SYNC, pendingDates);
+          }
         } else {
-          console.log('✅ Entrées sauvegardées dans Supabase');
+          console.log(`✅ Entrée ${date} synchronisée immédiatement`);
+          // Marquer comme synchronisée
+          const syncedDates = await storage.get(STORAGE_KEYS.SYNCED_ENTRIES, []);
+          if (!syncedDates.includes(date)) {
+            syncedDates.push(date);
+            await storage.set(STORAGE_KEYS.SYNCED_ENTRIES, syncedDates);
+          }
         }
       } catch (error) {
-        console.error('❌ Erreur lors de la sauvegarde entrées:', error);
+        console.error(`❌ Erreur lors de la synchronisation immédiate pour ${date}:`, error);
+        // Ajouter à la liste des entrées en attente
+        const pendingDates = await storage.get(STORAGE_KEYS.PENDING_SYNC, []);
+        if (!pendingDates.includes(date)) {
+          pendingDates.push(date);
+          await storage.set(STORAGE_KEYS.PENDING_SYNC, pendingDates);
+        }
       }
     }
   },
 
-  async addEntry(date: string, entry: DailyEntry): Promise<void> {
-    const entries = await this.get();
-    entries[date] = entry;
-    return this.set(entries);
+  // Synchroniser les entrées en attente en arrière-plan
+  async syncPendingEntriesInBackground(): Promise<void> {
+    const userId = await getCurrentUserId();
+    if (!userId) return;
+
+    // Utiliser setTimeout pour ne pas bloquer l'interface
+    setTimeout(async () => {
+      try {
+        const pendingDates = await storage.get(STORAGE_KEYS.PENDING_SYNC, []);
+        const syncedDates = await storage.get(STORAGE_KEYS.SYNCED_ENTRIES, []);
+        const entries = await storage.get(STORAGE_KEYS.DAILY_ENTRIES, {});
+        
+        // Filtrer les entrées qui ne sont pas encore synchronisées
+        const unsyncedDates = pendingDates.filter(date => !syncedDates.includes(date));
+        
+        if (unsyncedDates.length > 0) {
+          console.log(`💾 Synchronisation en arrière-plan de ${unsyncedDates.length} entrées...`);
+          
+          const { DataSyncService } = require('./dataSync');
+          const newSyncedDates = [...syncedDates];
+          
+          // Synchroniser chaque entrée non synchronisée
+          for (const date of unsyncedDates) {
+            if (entries[date]) {
+              const result = await DataSyncService.syncSingleDailyEntry(userId, date, entries[date]);
+              if (result.data) {
+                newSyncedDates.push(date);
+                console.log(`✅ Entrée ${date} synchronisée en arrière-plan`);
+              } else {
+                console.warn(`⚠️ Échec synchronisation ${date}:`, result.error);
+              }
+            }
+          }
+          
+          // Mettre à jour la liste des entrées synchronisées
+          await storage.set(STORAGE_KEYS.SYNCED_ENTRIES, newSyncedDates);
+          
+          // Nettoyer la liste des entrées en attente
+          const remainingPending = pendingDates.filter(date => !newSyncedDates.includes(date));
+          await storage.set(STORAGE_KEYS.PENDING_SYNC, remainingPending);
+          
+          console.log(`✅ Synchronisation en arrière-plan terminée. ${newSyncedDates.length - syncedDates.length} nouvelles entrées synchronisées.`);
+        }
+      } catch (error) {
+        console.error('❌ Erreur lors de la synchronisation en arrière-plan:', error);
+      }
+    }, 1000); // Délai de 1 seconde pour laisser l'interface se mettre à jour
+  },
+
+  // Méthode pour synchroniser sans délai (pour l'indicateur de sync)
+  async syncNow(entries: Record<string, DailyEntry>): Promise<boolean> {
+    const userId = await getCurrentUserId();
+    if (!userId) return false;
+
+    try {
+      console.log('💾 Synchronisation immédiate des entrées...', Object.keys(entries).length, 'entrées');
+      const { DataSyncService } = require('./dataSync');
+      const result = await DataSyncService.syncDailyEntries(userId, entries);
+      if (result.error) {
+        console.error('❌ Erreur synchronisation immédiate:', result.error);
+        return false;
+      } else {
+        console.log('✅ Entrées synchronisées immédiatement');
+        // Marquer toutes les entrées comme synchronisées
+        await storage.set(STORAGE_KEYS.SYNCED_ENTRIES, Object.keys(entries));
+        await storage.set(STORAGE_KEYS.PENDING_SYNC, []);
+        return true;
+      }
+    } catch (error) {
+      console.error('❌ Erreur lors de la synchronisation immédiate:', error);
+      return false;
+    }
+  },
+
+  // Forcer le rechargement des données depuis Supabase (pour les écrans d'analytics)
+  async refresh(): Promise<Record<string, DailyEntry>> {
+    const userId = await getCurrentUserId();
+    if (userId) {
+      try {
+        console.log('🔄 Rechargement des entrées depuis Supabase pour le graphique...');
+        const { DataSyncService } = await import('./dataSync');
+        const { data: remoteEntries } = await DataSyncService.getDailyEntries(userId);
+        if (remoteEntries && Object.keys(remoteEntries).length > 0) {
+          console.log('📥 Entrées rechargées depuis Supabase:', Object.keys(remoteEntries).length, 'entrées');
+          // Sauvegarder localement pour éviter de recharger à chaque fois
+          await storage.set(STORAGE_KEYS.DAILY_ENTRIES, remoteEntries);
+          return remoteEntries;
+        }
+      } catch (error) {
+        console.log('⚠️ Impossible de recharger les entrées depuis Supabase:', error);
+      }
+    }
+    
+    // Fallback sur les données locales si Supabase n'est pas disponible
+    const localEntries = await storage.get(STORAGE_KEYS.DAILY_ENTRIES, {});
+    return localEntries;
+  },
+
+  // Obtenir le statut de synchronisation
+  async getSyncStatus(): Promise<{ synced: number; pending: number; total: number }> {
+    const entries = await storage.get(STORAGE_KEYS.DAILY_ENTRIES, {});
+    const syncedDates = await storage.get(STORAGE_KEYS.SYNCED_ENTRIES, []);
+    const pendingDates = await storage.get(STORAGE_KEYS.PENDING_SYNC, []);
+    
+    return {
+      synced: syncedDates.length,
+      pending: pendingDates.length,
+      total: Object.keys(entries).length
+    };
   },
 };
 
@@ -485,6 +629,8 @@ export const clearLocalDataOnUserChange = async (): Promise<void> => {
       storage.remove(STORAGE_KEYS.STREAK),
       storage.remove(STORAGE_KEYS.GOALS),
       storage.remove(STORAGE_KEYS.ACHIEVEMENTS),
+      storage.remove(STORAGE_KEYS.SYNCED_ENTRIES),
+      storage.remove(STORAGE_KEYS.PENDING_SYNC),
     ]);
     
     console.log('Données locales nettoyées pour le changement d\'utilisateur (chrono préservé)');

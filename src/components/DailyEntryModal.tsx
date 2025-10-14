@@ -26,7 +26,7 @@ interface DailyEntryModalProps {
 
 const EMOTIONS: EmotionOption[] = [
   { type: 'happy', emoji: '😊', label: 'Heureux', color: '#10B981' },
-  { type: 'proud', emoji: '🥳', label: 'Fier', color: '#3B82F6' },
+  { type: 'proud', emoji: '🥳', label: 'Fier', color: '#8B45FF' },
   { type: 'frustrated', emoji: '😤', label: 'Frustré', color: '#EF4444' },
   { type: 'anxious', emoji: '😰', label: 'Anxieux', color: '#F59E0B' },
   { type: 'confident', emoji: '💪', label: 'Confiant', color: '#8B5CF6' },
@@ -252,7 +252,7 @@ export default function DailyEntryModal({
                   styles.saveButton,
                   { 
                     opacity: realCigs && selectedEmotion ? 1 : 0.5,
-                    backgroundColor: motivationalMsg?.color || '#3B82F6'
+                    backgroundColor: motivationalMsg?.color || '#8B45FF'
                   }
                 ]} 
                 onPress={handleSave}
@@ -317,15 +317,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   goalContainer: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    backgroundColor: 'rgba(139, 69, 255, 0.2)',
     borderRadius: 12,
     padding: 15,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
+    borderColor: 'rgba(139, 69, 255, 0.3)',
   },
   goalLabel: {
-    color: '#3B82F6',
+    color: '#8B45FF',
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
@@ -399,15 +399,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   dailySummaryContainer: {
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    backgroundColor: 'rgba(139, 69, 255, 0.1)',
     borderRadius: 12,
     padding: 15,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.2)',
+    borderColor: 'rgba(139, 69, 255, 0.2)',
   },
   dailySummaryTitle: {
-    color: '#3B82F6',
+    color: '#8B45FF',
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 10,
