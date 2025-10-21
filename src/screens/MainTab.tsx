@@ -12,6 +12,7 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { sessionStorage, dailyEntriesStorage, streakStorage, profileStorage, settingsStorage } from '../lib/storage';
 import { notificationService } from '../lib/notificationService';
+import { useSubscription } from '../contexts/SubscriptionContextMock';
 import { 
   formatTime, 
   getBallColor, 
@@ -19,6 +20,7 @@ import {
   getProgressiveGoal,
   calculateValidStreak,
   calculateConnectionStreak,
+  calculateRealConnectionStreak,
   calculateSessionStreak,
   calculateCigarettesAvoided,
   calculateMoneySaved,
@@ -40,6 +42,7 @@ interface MainTabProps {
 
 export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClosed }: MainTabProps) {
   const navigation = useNavigation() as any;
+  const { isPremium } = useSubscription();
   const [session, setSession] = useState<TimerSession>({
     isRunning: false,
     startTimestamp: null,
@@ -66,11 +69,33 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
   const [selectedDate, setSelectedDate] = useState('');
   const [onboardingVisible, setOnboardingVisible] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-
-
   useEffect(() => {
     loadData();
   }, []);
+
+  const handlePanicButton = () => {
+    // TODO: Vérifier si l'utilisateur a le bundle Panique
+    Alert.alert(
+      '🚨 Bouton Panique',
+      'Cette fonctionnalité sera disponible avec le pack Panique Premium.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Voir les offres', onPress: () => navigation.navigate('Premium') }
+      ]
+    );
+  };
+
+  const handleAITherapistButton = () => {
+    // TODO: Vérifier si l'utilisateur a le bundle Coach IA
+    Alert.alert(
+      '🤖 Coach IA',
+      'Cette fonctionnalité sera disponible avec le pack Coach IA Premium.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Voir les offres', onPress: () => navigation.navigate('Premium') }
+      ]
+    );
+  };
 
   // Vérifier si l'onboarding est nécessaire
   useEffect(() => {
@@ -174,17 +199,17 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
         setProfile(defaultProfile);
       }
 
-      // Recalculer le streak basé sur les entrées existantes (sans reset)
+      // Recalculer le streak basé sur les connexions réelles (pas les saisies rétroactives)
       if (Object.keys(entriesData).length > 0) {
-        const sortedDates = Object.keys(entriesData).sort().reverse();
-        const lastEntryDate = sortedDates[0];
+        const today = new Date().toISOString().split('T')[0];
         
-        // Utiliser le streak basé sur les connexions (entrées quotidiennes)
-        const connectionStreak = calculateConnectionStreak(entriesData, lastEntryDate);
+        // Utiliser le streak basé sur les connexions réelles uniquement
+        // Cela empêche la triche avec les saisies rétroactives
+        const realConnectionStreak = calculateRealConnectionStreak(entriesData, today);
         
         const updatedStreak: StreakData = {
-          lastDateConnected: lastEntryDate,
-          currentStreak: connectionStreak,
+          lastDateConnected: today,
+          currentStreak: realConnectionStreak,
         };
         setStreak(updatedStreak);
       } else {
@@ -287,19 +312,26 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
 
   const handleSaveEntry = async (entry: DailyEntry) => {
     try {
-      const newEntries = { ...dailyEntries, [entry.date]: entry };
+      // Marquer la date de connexion réelle pour distinguer des saisies rétroactives
+      const today = new Date().toISOString().split('T')[0];
+      const entryWithConnectionDate: DailyEntry = {
+        ...entry,
+        connectedOnDate: today
+      };
+      
+      const newEntries = { ...dailyEntries, [entry.date]: entryWithConnectionDate };
       setDailyEntries(newEntries);
       
       // Utiliser la méthode optimisée addEntry qui synchronise immédiatement la nouvelle entrée
       setIsSyncing(true);
-      await dailyEntriesStorage.addEntry(entry.date, entry);
+      await dailyEntriesStorage.addEntry(entry.date, entryWithConnectionDate);
       setIsSyncing(false);
       
-      // Recalculer le streak basé sur les connexions (entrées quotidiennes)
-      const connectionStreak = calculateConnectionStreak(newEntries, entry.date);
+      // Recalculer le streak basé sur les connexions réelles uniquement
+      const realConnectionStreak = calculateRealConnectionStreak(newEntries, today);
       const newStreakData: StreakData = {
-        lastDateConnected: entry.date,
-        currentStreak: connectionStreak,
+        lastDateConnected: today,
+        currentStreak: realConnectionStreak,
       };
       
       setStreak(newStreakData);
@@ -613,6 +645,7 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
 
           {/* Boutons d'action */}
           <View style={styles.buttonsContainer}>
+            {/* Bouton Engager/Démarrer */}
             <TouchableOpacity
               style={[styles.actionButton, styles.commitButton]}
               onPress={session.startTimestamp ? handleStop : handleStart}
@@ -625,17 +658,31 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.actionButton, styles.meditateButton]}>
-              <Text style={styles.actionButtonIcon}>🧘</Text>
-              <Text style={styles.actionButtonText}>Méditer</Text>
-            </TouchableOpacity>
-
+            {/* Bouton Recommencer */}
             <TouchableOpacity 
               style={[styles.actionButton, styles.restartButton]}
               onPress={handleRestart}
             >
               <Text style={styles.actionButtonIcon}>↻</Text>
               <Text style={styles.actionButtonText}>Recommencer</Text>
+            </TouchableOpacity>
+
+            {/* Bouton Panique */}
+            <TouchableOpacity
+              style={[styles.actionButton, styles.panicButton]}
+              onPress={handlePanicButton}
+            >
+              <Text style={styles.actionButtonIcon}>🚨</Text>
+              <Text style={styles.actionButtonText}>Panique</Text>
+            </TouchableOpacity>
+
+            {/* Bouton Coach IA */}
+            <TouchableOpacity
+              style={[styles.actionButton, styles.aiTherapistButton]}
+              onPress={handleAITherapistButton}
+            >
+              <Text style={styles.actionButtonIcon}>💬</Text>
+              <Text style={styles.actionButtonText}>Coach IA</Text>
             </TouchableOpacity>
 
           </View>
@@ -1024,17 +1071,17 @@ const styles = StyleSheet.create({
   },
   buttonsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 40,
-    paddingHorizontal: 10,
+    paddingHorizontal: 15,
   },
   actionButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 75,
+    height: 75,
+    borderRadius: 37.5,
     borderWidth: 2,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     shadowColor: '#000',
@@ -1042,16 +1089,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+    marginHorizontal: 4, // Espacement horizontal entre les boutons
   },
   commitButton: {
     backgroundColor: 'rgba(76, 175, 80, 0.3)',
     borderColor: 'rgba(76, 175, 80, 0.7)',
     shadowColor: '#4CAF50',
   },
-  meditateButton: {
-    backgroundColor: 'rgba(139, 69, 255, 0.3)',
-    borderColor: 'rgba(139, 69, 255, 0.7)',
-    shadowColor: '#8B45FF',
+  panicButton: {
+    backgroundColor: 'rgba(239, 68, 68, 0.3)',
+    borderColor: 'rgba(239, 68, 68, 0.7)',
+    shadowColor: '#EF4444',
+  },
+  aiTherapistButton: {
+    backgroundColor: 'rgba(59, 130, 246, 0.3)',
+    borderColor: 'rgba(59, 130, 246, 0.7)',
+    shadowColor: '#3B82F6',
   },
   restartButton: {
     backgroundColor: 'rgba(255, 152, 0, 0.3)',
@@ -1070,9 +1123,10 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: '600',
     textAlign: 'center',
+    lineHeight: 10,
   },
   statsContainer: {
     flexDirection: 'row',

@@ -8,10 +8,12 @@ import * as Notifications from 'expo-notifications';
 
 // Import des contextes et écrans
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+import { SubscriptionProviderMock as SubscriptionProvider } from './src/contexts/SubscriptionContextMock';
 import { AuthScreen } from './src/screens/AuthScreen';
 import MainTab from './src/screens/MainTab';
 import ProfileTab from './src/screens/ProfileTab';
 import AnalyticsTab from './src/screens/AnalyticsTab';
+import PremiumTab from './src/screens/PremiumTab';
 import SettingsTab from './src/screens/SettingsTab';
 import { notificationService, NotificationData } from './src/lib/notificationService';
 
@@ -80,6 +82,8 @@ function MainApp() {
               iconName = focused ? 'person' : 'person-outline';
             } else if (route.name === 'Analytics') {
               iconName = focused ? 'analytics' : 'analytics-outline';
+            } else if (route.name === 'Premium') {
+              iconName = focused ? 'star' : 'star-outline';
             } else if (route.name === 'Réglages') {
               iconName = focused ? 'settings' : 'settings-outline';
             } else {
@@ -143,6 +147,14 @@ function MainApp() {
           }}
         />
         <Tab.Screen 
+          name="Premium" 
+          component={PremiumTab}
+          options={{
+            title: '⭐',
+            headerTitle: '⭐ Premium',
+          }}
+        />
+        <Tab.Screen 
           name="Réglages" 
           component={SettingsTab}
           options={{
@@ -155,11 +167,13 @@ function MainApp() {
   );
 }
 
-// Composant principal avec le provider d'authentification
+// Composant principal avec les providers
 export default function App() {
   return (
     <AuthProvider>
-      <MainApp />
+      <SubscriptionProvider>
+        <MainApp />
+      </SubscriptionProvider>
     </AuthProvider>
   );
 }

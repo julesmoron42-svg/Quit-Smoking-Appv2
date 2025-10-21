@@ -130,3 +130,5 @@ Utilisez "🔍 Diagnostic complet" pour voir :
 - ✅ **Long terme** : Utiliser une build de développement ou production pour les vraies notifications programmées
 
 **Les notifications quotidiennes fonctionneront parfaitement** dans une vraie app ! 🎉
+
+

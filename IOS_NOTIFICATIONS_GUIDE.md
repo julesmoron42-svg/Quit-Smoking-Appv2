@@ -161,3 +161,5 @@ Après ces modifications, sur un iPhone physique avec Expo Go :
 3. **Redémarrez Expo Go** et l'iPhone
 4. **Utilisez le diagnostic complet** pour identifier le problème
 5. **Vérifiez les logs** dans la console d'Expo
+
+

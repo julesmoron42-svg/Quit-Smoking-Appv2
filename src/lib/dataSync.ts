@@ -168,6 +168,7 @@ export class DataSyncService {
         goal_cigs: entry.goalCigs,
         emotion: entry.emotion,
         objective_met: entry.objectiveMet,
+        connected_on_date: entry.connectedOnDate,
         updated_at: new Date().toISOString(),
       };
 
@@ -269,6 +270,7 @@ export class DataSyncService {
           date: entry.date,
           emotion: entry.emotion,
           objectiveMet: entry.objective_met,
+          connectedOnDate: entry.connected_on_date,
         };
       });
 

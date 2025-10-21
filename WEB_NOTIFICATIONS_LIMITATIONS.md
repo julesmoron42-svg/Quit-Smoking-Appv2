@@ -114,3 +114,5 @@ if (Platform.OS === 'web') {
 - ✅ L'application fonctionne correctement sur mobile
 
 **Votre code est correct !** Le problème vient des limitations de la plateforme web.
+
+

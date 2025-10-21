@@ -313,6 +313,45 @@ export const calculateConnectionStreak = (
   return streak;
 };
 
+// Calcul du streak basé uniquement sur les connexions réelles (pas les saisies rétroactives)
+export const calculateRealConnectionStreak = (
+  dailyEntries: Record<string, DailyEntry>,
+  currentDate: string
+): number => {
+  const sortedDates = Object.keys(dailyEntries).sort();
+  if (sortedDates.length === 0) return 0;
+  
+  let streak = 0;
+  let checkDate = new Date(currentDate);
+  
+  // Vérifier les jours en arrière, en commençant par aujourd'hui
+  for (let i = 0; i < 365; i++) { // Max 1 an
+    const dateStr = checkDate.toISOString().split('T')[0];
+    const entry = dailyEntries[dateStr];
+    
+    if (entry && entry.connectedOnDate) {
+      // Vérifier que l'entrée a été créée le jour même (connexion réelle)
+      const connectedDate = new Date(entry.connectedOnDate);
+      const entryDate = new Date(entry.date);
+      
+      // L'entrée compte seulement si elle a été créée le jour même
+      if (connectedDate.toISOString().split('T')[0] === entryDate.toISOString().split('T')[0]) {
+        streak++;
+        // Passer au jour précédent
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        // Arrêter dès qu'on trouve une entrée rétroactive
+        break;
+      }
+    } else {
+      // Arrêter dès qu'on trouve un jour sans entrée ou sans date de connexion
+      break;
+    }
+  }
+  
+  return streak;
+};
+
 // Calcul du streak basé sur la session du chrono (pour les utilisateurs qui se connectent quotidiennement)
 export const calculateSessionStreak = (
   sessionElapsed: number,

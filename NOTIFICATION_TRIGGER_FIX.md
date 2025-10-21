@@ -104,3 +104,5 @@ trigger: {
 2. Si ça fonctionne, les notifications quotidiennes devraient marcher
 3. Si ça ne fonctionne pas, utiliser le diagnostic complet
 4. Vérifier les permissions si nécessaire
+
+

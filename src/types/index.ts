@@ -43,6 +43,7 @@ export interface DailyEntry {
   date: string; // YYYY-MM-DD
   emotion?: EmotionType;
   objectiveMet: boolean;
+  connectedOnDate?: string; // Date de connexion réelle (YYYY-MM-DD) - pour distinguer les saisies rétroactives
 }
 
 // Types pour les émotions
