@@ -53,7 +53,7 @@ export default function PremiumFeatureCard({ feature, isPremium, onPress }: Prem
 
       {/* Overlay pour les fonctionnalités non disponibles */}
       {!isPremium && (
-        <View style={styles.overlay}>
+        <View style={styles.overlay} pointerEvents="box-none">
           <View style={styles.comingSoonBadge}>
             <Text style={styles.comingSoonText}>Bientôt</Text>
           </View>
