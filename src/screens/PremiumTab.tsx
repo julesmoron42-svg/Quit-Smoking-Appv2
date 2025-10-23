@@ -16,6 +16,9 @@ import PremiumFeatureCard from '../components/PremiumFeatureCard';
 import BreathingExerciseWithSound from '../components/BreathingExerciseWithSound';
 import MeditationExerciseWithSound from '../components/MeditationExerciseWithSound';
 import MeditationAntiSmokingExercises from '../components/MeditationAntiSmokingExercises';
+import SoundsOverlay from '../components/SoundsOverlay';
+import { panicStatsStorage } from '../lib/storage';
+import { PanicStats } from '../types';
 
 const { width } = Dimensions.get('window');
 
@@ -24,9 +27,15 @@ export default function PremiumTab() {
   const [selectedPlan, setSelectedPlan] = useState(SUBSCRIPTION_PLANS[2]); // Pack Complet par défaut
   const [showBreathingExercise, setShowBreathingExercise] = useState(false);
   const [showMeditationExercise, setShowMeditationExercise] = useState(false);
+  const [showSoundsLibrary, setShowSoundsLibrary] = useState(false);
   
-  // Statistiques de panique (à récupérer depuis le contexte ou localStorage)
-  const [panicStats, setPanicStats] = useState({
+  // Log pour déboguer l'état
+  useEffect(() => {
+    console.log('🔍 État showSoundsLibrary:', showSoundsLibrary);
+  }, [showSoundsLibrary]);
+  
+  // Statistiques de panique (synchronisées avec Supabase)
+  const [panicStats, setPanicStats] = useState<PanicStats>({
     panicCount: 0,
     successCount: 0,
   });
@@ -35,10 +44,8 @@ export default function PremiumTab() {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        const storedStats = await sessionStorage.getItem('panicStats');
-        if (storedStats) {
-          setPanicStats(JSON.parse(storedStats));
-        }
+        const stats = await panicStatsStorage.get();
+        setPanicStats(stats);
       } catch (error) {
         console.log('Erreur lors du chargement des stats:', error);
       }
@@ -64,20 +71,49 @@ export default function PremiumTab() {
 
 
   const handleFeaturePress = (feature: any) => {
+    console.log('🔍 handleFeaturePress appelé:', {
+      featureId: feature.id,
+      featureTitle: feature.title,
+      isPremium: isPremium,
+      featureIsAvailable: feature.isAvailable
+    });
+    
+    console.log('🔍 État complet:', {
+      isPremium,
+      showSoundsLibrary,
+      feature
+    });
+    
     if (isPremium) {
-      // Vérifier si c'est une fonctionnalité d'exercice
+      // Vérifier si c'est une fonctionnalité d'exercice disponible
       if (feature.id === 'breathing_exercises') {
+        console.log('🫁 Ouverture exercices de respiration');
         setShowBreathingExercise(true);
       } else if (feature.id === 'meditation_library') {
+        console.log('🧘 Ouverture bibliothèque méditations');
         setShowMeditationExercise(true);
+      } else if (feature.id === 'relaxation_sounds' || feature.id === 'sounds_library') {
+        console.log('🎵 Ouverture sons de relaxation');
+        setShowSoundsLibrary(true);
       } else {
-        Alert.alert(
-          'Fonctionnalité disponible',
-          `La fonctionnalité "${feature.title}" sera bientôt disponible !`,
-          [{ text: 'OK' }]
-        );
+        console.log('❓ Fonctionnalité non reconnue:', feature.id);
+        // Pour les autres fonctionnalités, vérifier si elles sont disponibles
+        if (feature.isAvailable) {
+          Alert.alert(
+            'Fonctionnalité disponible',
+            `La fonctionnalité "${feature.title}" est maintenant disponible !`,
+            [{ text: 'OK' }]
+          );
+        } else {
+          Alert.alert(
+            'Fonctionnalité disponible',
+            `La fonctionnalité "${feature.title}" sera bientôt disponible !`,
+            [{ text: 'OK' }]
+          );
+        }
       }
     } else {
+      console.log('💳 Utilisateur non premium');
       Alert.alert(
         'Fonctionnalité Premium',
         `Cette fonctionnalité est disponible avec l'abonnement Premium. Voulez-vous vous abonner ?`,
@@ -90,13 +126,22 @@ export default function PremiumTab() {
   };
 
   // Fonction pour mettre à jour les stats
-  const updatePanicStats = async (newStats: { panicCount: number; successCount: number }) => {
+  const updatePanicStats = async (newStats: PanicStats) => {
     setPanicStats(newStats);
     try {
-      await sessionStorage.setItem('panicStats', JSON.stringify(newStats));
+      await panicStatsStorage.set(newStats);
     } catch (error) {
       console.log('Erreur lors de la sauvegarde des stats:', error);
     }
+  };
+
+  // Fonction pour mettre à jour les stats depuis les sons
+  const updatePanicStatsFromSounds = async (stats: { panicCount: number; successCount: number }) => {
+    const newStats = {
+      panicCount: panicStats.panicCount + stats.panicCount,
+      successCount: panicStats.successCount + stats.successCount,
+    };
+    await updatePanicStats(newStats);
   };
 
   return (
@@ -140,6 +185,7 @@ export default function PremiumTab() {
         </View>
 
         {/* Boutons ronds pour les features */}
+        {/* Boutons ronds pour les features */}
         <View style={styles.featuresGrid}>
           <TouchableOpacity 
             style={[styles.featureButton, styles.breathingButton]}
@@ -159,9 +205,12 @@ export default function PremiumTab() {
           
           <TouchableOpacity 
             style={[styles.featureButton, styles.soundsButton]}
-            onPress={() => Alert.alert('Bientôt disponible', 'Les sons apaisants arrivent bientôt !')}
+            onPress={() => {
+              console.log('🎵 SON CLIQUE - OUVERTURE DIRECTE');
+              setShowSoundsLibrary(true);
+            }}
           >
-            <Text style={styles.featureEmoji}>🔊</Text>
+            <Text style={styles.featureEmoji}>🎵</Text>
             <Text style={styles.featureText}>Sons</Text>
           </TouchableOpacity>
           
@@ -237,6 +286,18 @@ export default function PremiumTab() {
             onClose={() => setShowMeditationExercise(false)} 
             onStatsUpdate={updatePanicStats}
             panicStats={panicStats}
+          />
+        </View>
+      )}
+
+      {showSoundsLibrary && (
+        <View style={styles.modalContainer}>
+          <SoundsOverlay 
+            onClose={() => {
+              console.log('🎵 FERMETURE OVERLAY SONS');
+              setShowSoundsLibrary(false);
+            }} 
+            onStatsUpdate={updatePanicStatsFromSounds}
           />
         </View>
       )}
@@ -570,5 +631,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#94A3B8',
     lineHeight: 22,
+  },
+  mainFeaturesSection: {
+    marginBottom: 30,
+  },
+  featureCard: {
+    width: '48%',
+    borderRadius: 16,
+    overflow: 'hidden',
+    minHeight: 120,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  featureGradient: {
+    flex: 1,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureDescription: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 14,
   },
 });

@@ -8,7 +8,8 @@ import {
   StreakData, 
   FinancialGoal, 
   Achievement,
-  ExportData 
+  ExportData,
+  PanicStats
 } from '../types';
 import { DataSyncService } from './dataSync';
 
@@ -21,6 +22,7 @@ const STORAGE_KEYS = {
   STREAK: '@MyQuitZone:streak',
   GOALS: '@MyQuitZone:goals',
   ACHIEVEMENTS: '@MyQuitZone:achievements',
+  PANIC_STATS: '@MyQuitZone:panicStats',
   SYNCED_ENTRIES: '@MyQuitZone:syncedEntries', // Nouvelles entrées synchronisées
   PENDING_SYNC: '@MyQuitZone:pendingSync', // Entrées en attente de synchronisation
 } as const;
@@ -51,6 +53,11 @@ const DEFAULT_SESSION: TimerSession = {
 const DEFAULT_STREAK: StreakData = {
   lastDateConnected: '',
   currentStreak: 0,
+};
+
+const DEFAULT_PANIC_STATS: PanicStats = {
+  panicCount: 0,
+  successCount: 0,
 };
 
 // Stockage adapté selon la plateforme
@@ -579,9 +586,64 @@ export const achievementsStorage = {
   },
 };
 
+export const panicStatsStorage = {
+  async get(): Promise<PanicStats> {
+    // D'abord essayer de charger depuis le stockage local
+    const localStats = await storage.get(STORAGE_KEYS.PANIC_STATS, DEFAULT_PANIC_STATS);
+    
+    // Si les stats sont par défaut, essayer de charger depuis Supabase
+    if (localStats.panicCount === DEFAULT_PANIC_STATS.panicCount && 
+        localStats.successCount === DEFAULT_PANIC_STATS.successCount) {
+      const userId = await getCurrentUserId();
+      if (userId) {
+        try {
+          const { DataSyncService } = await import('./dataSync');
+          const { data: remoteStats } = await DataSyncService.getPanicStats(userId);
+          if (remoteStats) {
+            console.log('📥 Stats panique chargées depuis Supabase:', remoteStats);
+            // Sauvegarder localement pour éviter de recharger à chaque fois
+            await storage.set(STORAGE_KEYS.PANIC_STATS, remoteStats);
+            return remoteStats;
+          }
+        } catch (error) {
+          console.log('⚠️ Impossible de charger les stats panique depuis Supabase:', error);
+        }
+      }
+    }
+    
+    return localStats;
+  },
+
+  async set(stats: PanicStats): Promise<void> {
+    // Sauvegarder localement
+    await storage.set(STORAGE_KEYS.PANIC_STATS, stats);
+    
+    // Synchroniser avec Supabase
+    const userId = await getCurrentUserId();
+    if (userId) {
+      console.log('💾 Sauvegarde des stats panique vers Supabase...', stats);
+      try {
+        const { DataSyncService } = require('./dataSync');
+        const result = await DataSyncService.syncPanicStats(userId, stats);
+        if (result.error) {
+          console.error('❌ Erreur sauvegarde stats panique:', result.error);
+        } else {
+          console.log('✅ Stats panique sauvegardées dans Supabase');
+        }
+      } catch (error) {
+        console.error('❌ Erreur lors de la sauvegarde stats panique:', error);
+      }
+    }
+  },
+
+  async updateStats(newStats: PanicStats): Promise<void> {
+    await this.set(newStats);
+  },
+};
+
 // Fonction d'export de toutes les données
 export const exportAllData = async (): Promise<ExportData> => {
-  const [profile, settings, session, dailyEntries, streak, goals, achievements] = await Promise.all([
+  const [profile, settings, session, dailyEntries, streak, goals, achievements, panicStats] = await Promise.all([
     profileStorage.get(),
     settingsStorage.get(),
     sessionStorage.get(),
@@ -589,6 +651,7 @@ export const exportAllData = async (): Promise<ExportData> => {
     streakStorage.get(),
     goalsStorage.get(),
     achievementsStorage.get(),
+    panicStatsStorage.get(),
   ]);
 
   return {
@@ -599,6 +662,7 @@ export const exportAllData = async (): Promise<ExportData> => {
     streak,
     goals,
     achievements,
+    panicStats,
     exportDate: new Date().toISOString(),
   };
 };
@@ -613,6 +677,7 @@ export const importData = async (data: ExportData): Promise<void> => {
     streakStorage.set(data.streak),
     goalsStorage.set(data.goals),
     achievementsStorage.set(data.achievements),
+    data.panicStats ? panicStatsStorage.set(data.panicStats) : Promise.resolve(),
   ]);
 };
 
@@ -629,6 +694,7 @@ export const clearLocalDataOnUserChange = async (): Promise<void> => {
       storage.remove(STORAGE_KEYS.STREAK),
       storage.remove(STORAGE_KEYS.GOALS),
       storage.remove(STORAGE_KEYS.ACHIEVEMENTS),
+      storage.remove(STORAGE_KEYS.PANIC_STATS),
       storage.remove(STORAGE_KEYS.SYNCED_ENTRIES),
       storage.remove(STORAGE_KEYS.PENDING_SYNC),
     ]);

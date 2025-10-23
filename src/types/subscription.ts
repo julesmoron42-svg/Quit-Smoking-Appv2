@@ -99,7 +99,7 @@ export const PREMIUM_FEATURES: PremiumFeature[] = [
     description: 'Techniques guidées pour gérer le stress et l\'anxiété',
     icon: '🫁',
     category: 'meditation',
-    isAvailable: false,
+    isAvailable: true,
     requiresPremium: true
   },
   {
@@ -108,7 +108,7 @@ export const PREMIUM_FEATURES: PremiumFeature[] = [
     description: 'Séances de méditation adaptées au sevrage tabagique',
     icon: '🧘',
     category: 'meditation',
-    isAvailable: false,
+    isAvailable: true,
     requiresPremium: true
   },
   {
@@ -117,7 +117,7 @@ export const PREMIUM_FEATURES: PremiumFeature[] = [
     description: 'Bruits blancs, nature et ambiances apaisantes',
     icon: '🎵',
     category: 'meditation',
-    isAvailable: false,
+    isAvailable: true,
     requiresPremium: true
   }
 ];

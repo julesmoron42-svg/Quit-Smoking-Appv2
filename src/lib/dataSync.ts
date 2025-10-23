@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { UserProfile, AppSettings, DailyEntry, FinancialGoal, Achievement, StreakData, TimerSession, HealthBenefit } from '../types';
+import { UserProfile, AppSettings, DailyEntry, FinancialGoal, Achievement, StreakData, TimerSession, HealthBenefit, PanicStats } from '../types';
 
 export class DataSyncService {
   // Synchroniser le profil utilisateur
@@ -582,6 +582,82 @@ export class DataSyncService {
     }
   }
 
+  // Synchroniser les statistiques de panique
+  static async syncPanicStats(userId: string, stats: PanicStats) {
+    try {
+      // D'abord, essayer de récupérer l'enregistrement existant
+      const { data: existingData } = await supabase
+        .from('user_panic_stats')
+        .select('*')
+        .eq('user_id', userId) // userId est maintenant l'email
+        .single();
+
+      if (existingData) {
+        // Mettre à jour l'enregistrement existant
+        const { data, error } = await supabase
+          .from('user_panic_stats')
+          .update({
+            panic_count: stats.panicCount,
+            success_count: stats.successCount,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', userId) // userId est maintenant l'email
+          .select()
+          .single();
+
+        if (error) throw error;
+        return { data, error: null };
+      } else {
+        // Créer un nouvel enregistrement
+        const { data, error } = await supabase
+          .from('user_panic_stats')
+          .insert({
+            user_id: userId, // userId est maintenant l'email
+            panic_count: stats.panicCount,
+            success_count: stats.successCount,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return { data, error: null };
+      }
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation des stats panique:', error);
+      return { data: null, error };
+    }
+  }
+
+  // Récupérer les statistiques de panique
+  static async getPanicStats(userId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('user_panic_stats')
+        .select('*')
+        .eq('user_id', userId) // userId est maintenant l'email
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Erreur détaillée stats panique:', error);
+        throw error;
+      }
+      
+      // Convertir les noms de colonnes de snake_case vers camelCase
+      const stats: PanicStats = data ? {
+        panicCount: data.panic_count,
+        successCount: data.success_count,
+      } : null;
+      
+      console.log('Stats panique récupérées:', { data, stats, error });
+      return { data: stats, error: null };
+    } catch (error) {
+      console.error('Erreur lors de la récupération des stats panique:', error);
+      return { data: null, error };
+    }
+  }
+
   // Synchroniser toutes les données utilisateur
   static async syncAllUserData(userId: string, appData: {
     profile: UserProfile;
@@ -591,6 +667,7 @@ export class DataSyncService {
     achievements: Achievement[];
     streak: StreakData;
     session: TimerSession;
+    panicStats: PanicStats;
   }) {
     try {
       await Promise.all([
@@ -601,6 +678,7 @@ export class DataSyncService {
         this.syncAchievements(userId, appData.achievements),
         this.syncStreak(userId, appData.streak),
         this.syncTimerSession(userId, appData.session),
+        this.syncPanicStats(userId, appData.panicStats),
       ]);
 
       return { success: true, error: null };

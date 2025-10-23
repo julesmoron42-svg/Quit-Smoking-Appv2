@@ -97,6 +97,7 @@ export interface ExportData {
   achievements: Achievement[];
   streak: StreakData;
   session: TimerSession;
+  panicStats?: PanicStats;
   exportDate: string;
 }
 
@@ -118,4 +119,10 @@ export interface Statistics {
   daysOfGrowth: number;
   currentStreak: number;
   longestStreak: number;
+}
+
+// Types pour les statistiques de panique
+export interface PanicStats {
+  panicCount: number;
+  successCount: number;
 }
