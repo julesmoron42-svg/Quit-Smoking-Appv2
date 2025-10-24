@@ -8,8 +8,10 @@ import {
   ScrollView,
   Dimensions,
   Alert,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import StarryBackground from './StarryBackground';
 import { OnboardingStepData, OnboardingQuestionnaireData } from '../types';
 import { HapticService } from '../lib/hapticService';
 import { TypewriterText } from './TypewriterText';
@@ -437,40 +439,7 @@ export default function NewOnboardingFlow({ visible, onComplete }: NewOnboarding
 
   return (
     <View style={styles.overlay}>
-      <LinearGradient
-        colors={['#071033', '#1a1a2e', '#16213e', '#071033']}
-        style={styles.container}
-      >
-        {/* Fond étoilé */}
-        <View style={styles.starryBackground}>
-          {Array.from({ length: 50 }).map((_, i) => {
-            const positions = [
-              { left: 10, top: 15 }, { left: 25, top: 8 }, { left: 40, top: 20 }, { left: 60, top: 12 }, { left: 80, top: 18 },
-              { left: 90, top: 25 }, { left: 15, top: 35 }, { left: 35, top: 40 }, { left: 55, top: 32 }, { left: 75, top: 38 },
-              { left: 85, top: 45 }, { left: 20, top: 55 }, { left: 45, top: 60 }, { left: 65, top: 52 }, { left: 85, top: 58 },
-              { left: 12, top: 70 }, { left: 30, top: 75 }, { left: 50, top: 68 }, { left: 70, top: 72 }, { left: 88, top: 78 },
-              { left: 18, top: 85 }, { left: 38, top: 88 }, { left: 58, top: 82 }, { left: 78, top: 85 }, { left: 92, top: 90 }
-            ];
-            
-            const pos = positions[i % positions.length];
-            const size = Math.random() * 3 + 2;
-            
-            return (
-              <View
-                key={i}
-                style={[
-                  styles.star,
-                  {
-                    left: pos.left + '%' as any,
-                    top: pos.top + '%' as any,
-                    width: size,
-                    height: size,
-                  },
-                ]}
-              />
-            );
-          })}
-        </View>
+      <StarryBackground>
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.content}>
@@ -478,7 +447,11 @@ export default function NewOnboardingFlow({ visible, onComplete }: NewOnboarding
               // Étapes d'introduction
               <View style={styles.introContainer}>
                 <View style={styles.logoContainer}>
-                  <Text style={styles.logo}>🌱</Text>
+                  <Image 
+                    source={require('../../assets/cigarette-logo.png')} 
+                    style={styles.logo}
+                    resizeMode="contain"
+                  />
                 </View>
                 <Text style={styles.introTitle}>{introSteps[currentStep].title}</Text>
                 
@@ -574,7 +547,7 @@ export default function NewOnboardingFlow({ visible, onComplete }: NewOnboarding
             )}
           </View>
         </ScrollView>
-      </LinearGradient>
+      </StarryBackground>
     </View>
   );
 }
@@ -631,8 +604,9 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   logo: {
-    fontSize: 80,
-    textAlign: 'center',
+    width: 80,
+    height: 80,
+    alignSelf: 'center',
   },
   introTitle: {
     fontSize: 28,
@@ -640,7 +614,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 20,
-    textShadowColor: '#8B45FF',
+    textShadowColor: '#8B5CF6',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
   },
@@ -656,7 +630,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
-    shadowColor: '#8B45FF',
+    shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -669,7 +643,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderWidth: 1,
     borderColor: 'rgba(139, 69, 255, 0.5)',
-    shadowColor: '#8B45FF',
+    shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -691,7 +665,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 10,
-    textShadowColor: '#8B45FF',
+    textShadowColor: '#8B5CF6',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
   },
@@ -713,7 +687,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#8B45FF',
+    backgroundColor: '#8B5CF6',
     borderRadius: 4,
   },
   progressText: {
@@ -776,7 +750,7 @@ const styles = StyleSheet.create({
   },
   checkmark: {
     fontSize: 18,
-    color: '#8B45FF',
+    color: '#8B5CF6',
     fontWeight: 'bold',
   },
   navigationContainer: {
@@ -805,7 +779,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: 'rgba(139, 69, 255, 0.5)',
-    shadowColor: '#8B45FF',
+    shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

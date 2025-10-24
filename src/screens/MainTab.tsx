@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,11 @@ import {
   Alert,
   Dimensions,
   ScrollView,
+  Animated,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import StarryBackground from '../components/StarryBackground';
 import { sessionStorage, dailyEntriesStorage, streakStorage, profileStorage, settingsStorage } from '../lib/storage';
 import { notificationService } from '../lib/notificationService';
 import { useSubscription } from '../contexts/SubscriptionContextMock';
@@ -50,6 +52,66 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
     startTimestamp: null,
     elapsedBeforePause: 0,
   });
+  
+  // Animation pour l'effet de battement de cœur
+  const heartbeatAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(1)).current;
+  
+  // Effet de battement de cœur
+  useEffect(() => {
+    const heartbeat = () => {
+      Animated.sequence([
+        Animated.timing(heartbeatAnim, {
+          toValue: 1.1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(heartbeatAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(heartbeatAnim, {
+          toValue: 1.05,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(heartbeatAnim, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        // Répéter après 2-3 secondes
+        setTimeout(heartbeat, 2000 + Math.random() * 1000);
+      });
+    };
+    
+    heartbeat();
+  }, [heartbeatAnim]);
+  
+  // Effet de pulsation douce pour le glow
+  useEffect(() => {
+    const glowPulse = () => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, {
+            toValue: 1.2,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    };
+    
+    glowPulse();
+  }, [glowAnim]);
+  
   const [elapsed, setElapsed] = useState(0);
   const [dailyEntries, setDailyEntries] = useState<Record<string, DailyEntry>>({});
   const [streak, setStreak] = useState<StreakData>({ lastDateConnected: '', currentStreak: 0 });
@@ -541,40 +603,7 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
         })}
       </View>
       
-      <LinearGradient
-        colors={['#0a0a0a', '#1a1a2e', '#16213e', '#0f3460']}
-        style={styles.gradientContainer}
-      >
-        {/* Fond étoilé */}
-        <View style={styles.starryBackground}>
-          {Array.from({ length: 30 }).map((_, i) => {
-            const positions = [
-              { left: 10, top: 15 }, { left: 25, top: 8 }, { left: 40, top: 20 }, { left: 60, top: 12 }, { left: 80, top: 18 },
-              { left: 90, top: 25 }, { left: 15, top: 35 }, { left: 35, top: 40 }, { left: 55, top: 32 }, { left: 75, top: 38 },
-              { left: 85, top: 45 }, { left: 20, top: 55 }, { left: 45, top: 60 }, { left: 65, top: 52 }, { left: 85, top: 58 },
-              { left: 12, top: 70 }, { left: 30, top: 75 }, { left: 50, top: 68 }, { left: 70, top: 72 }, { left: 88, top: 78 },
-              { left: 18, top: 85 }, { left: 38, top: 88 }, { left: 58, top: 82 }, { left: 78, top: 85 }, { left: 92, top: 90 }
-            ];
-            
-            const pos = positions[i % positions.length];
-            const size = Math.random() * 3 + 2;
-            
-            return (
-              <View
-                key={i}
-                style={[
-                  styles.star,
-                  {
-                    left: pos.left + '%' as any,
-                    top: pos.top + '%' as any,
-                    width: size,
-                    height: size,
-                  },
-                ]}
-              />
-            );
-          })}
-        </View>
+      <StarryBackground>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.content}>
           
@@ -648,9 +677,23 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
 
           {/* Orb central */}
           <View style={styles.orbContainer}>
-            <View style={styles.orb}>
-              <View style={styles.orbGlow} />
-            </View>
+            <Animated.View 
+              style={[
+                styles.orb,
+                {
+                  transform: [{ scale: heartbeatAnim }]
+                }
+              ]}
+            >
+              <Animated.View 
+                style={[
+                  styles.orbGlow,
+                  {
+                    transform: [{ scale: glowAnim }]
+                  }
+                ]} 
+              />
+            </Animated.View>
           </View>
 
           {/* Timer */}
@@ -907,7 +950,7 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
           </View>
           </View>
         </ScrollView>
-      </LinearGradient>
+      </StarryBackground>
 
       {/* Modal pour saisie quotidienne */}
       <DailyEntryModal
@@ -1060,30 +1103,32 @@ const styles = StyleSheet.create({
     marginVertical: 40,
   },
   orb: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: '#8B45FF',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(139, 92, 246, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    shadowColor: '#8B45FF',
+    shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 30,
-    elevation: 30,
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 20,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   orbGlow: {
     position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: 'rgba(139, 69, 255, 0.3)',
-    shadowColor: '#8B45FF',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 40,
-    elevation: 40,
+    shadowOpacity: 0.6,
+    shadowRadius: 25,
+    elevation: 25,
   },
   timerContainer: {
     alignItems: 'center',
@@ -1156,7 +1201,7 @@ const styles = StyleSheet.create({
   aiTherapistButton: {
     backgroundColor: 'rgba(59, 130, 246, 0.3)',
     borderColor: 'rgba(59, 130, 246, 0.7)',
-    shadowColor: '#3B82F6',
+    shadowColor: '#8B5CF6',
   },
   restartButton: {
     backgroundColor: 'rgba(255, 152, 0, 0.3)',

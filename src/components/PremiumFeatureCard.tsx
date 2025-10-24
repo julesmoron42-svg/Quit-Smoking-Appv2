@@ -46,7 +46,7 @@ export default function PremiumFeatureCard({ feature, isPremium, onPress }: Prem
               <Text style={styles.lockText}>Premium</Text>
             </View>
           ) : (
-            <Ionicons name="chevron-forward" size={20} color="#3B82F6" />
+            <Ionicons name="chevron-forward" size={20} color="#8B5CF6" />
           )}
         </View>
       </View>

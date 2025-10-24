@@ -113,3 +113,4 @@ export const useTypewriter = (
     progress: text.length > 0 ? currentIndex / text.length : 0
   };
 };
+

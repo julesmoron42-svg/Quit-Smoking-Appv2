@@ -9,6 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import StarryBackground from '../components/StarryBackground';
 import { Ionicons } from '@expo/vector-icons';
 import { useSubscription } from '../contexts/SubscriptionContextMock';
 import { PREMIUM_FEATURES, SUBSCRIPTION_PLANS } from '../types/subscription';
@@ -159,27 +160,7 @@ export default function PremiumTab() {
 
 
   return (
-    <LinearGradient
-      colors={['#071033', '#1E293B']}
-      style={styles.container}
-    >
-      {/* Fond étoilé */}
-      <View style={styles.starryBackground}>
-        {Array.from({ length: 50 }).map((_, i) => (
-          <View
-            key={i}
-            style={[
-              styles.star,
-              {
-                left: Math.random() * 100 + '%',
-                top: Math.random() * 100 + '%',
-                width: Math.random() * 3 + 1,
-                height: Math.random() * 3 + 1,
-              },
-            ]}
-          />
-        ))}
-      </View>
+    <StarryBackground>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header */}
@@ -283,7 +264,7 @@ export default function PremiumTab() {
             
             <View style={styles.statBox}>
               <Text style={styles.statEmoji}>📈</Text>
-              <Text style={[styles.statNumber, { color: '#3B82F6' }]}>
+              <Text style={[styles.statNumber, { color: '#8B5CF6' }]}>
                 {panicStats.panicCount > 0 ? Math.round((panicStats.successCount / panicStats.panicCount) * 100) : 0}%
               </Text>
               <Text style={styles.statLabel}>Taux de réussite</Text>
@@ -324,7 +305,7 @@ export default function PremiumTab() {
           />
         </View>
       )}
-    </LinearGradient>
+    </StarryBackground>
   );
 }
 
@@ -378,7 +359,7 @@ const styles = StyleSheet.create({
   },
   premiumCard: {
     backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    borderColor: '#3B82F6',
+    borderColor: '#8B5CF6',
   },
   freeCard: {
     backgroundColor: 'rgba(100, 116, 139, 0.1)',
@@ -395,7 +376,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   premiumText: {
-    color: '#3B82F6',
+    color: '#8B5CF6',
   },
   freeText: {
     color: '#64748B',
@@ -417,7 +398,7 @@ const styles = StyleSheet.create({
     borderColor: '#1E293B',
   },
   selectedPlanCard: {
-    borderColor: '#3B82F6',
+    borderColor: '#8B5CF6',
     backgroundColor: 'rgba(59, 130, 246, 0.1)',
   },
   planHeader: {
@@ -434,7 +415,7 @@ const styles = StyleSheet.create({
   planPrice: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#3B82F6',
+    color: '#8B5CF6',
   },
   planDescription: {
     fontSize: 14,
@@ -633,7 +614,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   restoreButtonText: {
-    color: '#3B82F6',
+    color: '#8B5CF6',
     fontSize: 14,
     textDecorationLine: 'underline',
   },

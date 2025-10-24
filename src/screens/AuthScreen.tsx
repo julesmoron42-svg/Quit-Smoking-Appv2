@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import StarryBackground from '../components/StarryBackground';
 
 interface AuthScreenProps {
   onAuthSuccess: () => void;
@@ -70,10 +71,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   };
 
   return (
-    <LinearGradient
-      colors={['#0a0a0a', '#1a1a2e', '#16213e', '#0f3460']}
-      style={styles.container}
-    >
+    <StarryBackground>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
@@ -158,7 +156,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </StarryBackground>
   );
 };
 
@@ -249,22 +247,29 @@ const styles = StyleSheet.create({
     maxWidth: 400,
   },
   input: {
-    backgroundColor: 'white',
-    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
     padding: 15,
     marginBottom: 15,
     fontSize: 16,
-    color: '#333',
+    color: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   button: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 10,
+    backgroundColor: '#8B5CF6',
+    borderRadius: 12,
     padding: 15,
     alignItems: 'center',
     marginBottom: 20,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   buttonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: 'rgba(139, 92, 246, 0.3)',
   },
   buttonText: {
     color: 'white',

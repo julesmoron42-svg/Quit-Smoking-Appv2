@@ -14,10 +14,11 @@ import {
   Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import StarryBackground from '../components/StarryBackground';
 import * as FileSystem from 'expo-file-system';
 // Pas de DateTimePicker nécessaire - nous utiliserons un modal personnalisé
-import { settingsStorage, exportAllData, importData, storage } from '../lib/storage';
-import { AppSettings, ExportData } from '../types';
+import { settingsStorage, exportAllData, importData, storage, profileStorage } from '../lib/storage';
+import { AppSettings, ExportData, UserProfile } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { notificationService } from '../lib/notificationService';
 
@@ -30,6 +31,13 @@ export default function SettingsTab() {
     language: 'fr',
     animationsEnabled: true,
     hapticsEnabled: true,
+  });
+  const [profile, setProfile] = useState<UserProfile>({
+    startedSmokingYears: 0,
+    cigsPerDay: 20,
+    objectiveType: 'complete',
+    reductionFrequency: 1,
+    onboardingCompleted: false,
   });
   const [notificationSettings, setNotificationSettings] = useState({
     enabled: false,
@@ -55,6 +63,7 @@ export default function SettingsTab() {
   useEffect(() => {
     loadSettings();
     loadNotificationSettings();
+    loadProfile();
   }, []);
 
   const loadSettings = async () => {
@@ -72,6 +81,17 @@ export default function SettingsTab() {
       setNotificationSettings(notificationData);
     } catch (error) {
       console.error('Erreur lors du chargement des paramètres de notification:', error);
+    }
+  };
+
+  const loadProfile = async () => {
+    try {
+      const profileData = await profileStorage.get();
+      if (profileData) {
+        setProfile(profileData);
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement du profil:', error);
     }
   };
 
@@ -120,6 +140,49 @@ export default function SettingsTab() {
     setSettings(newSettings);
     await saveSettings(newSettings);
     setShowCurrencyModal(false);
+  };
+
+  const saveProfile = async (newProfile: UserProfile) => {
+    try {
+      await profileStorage.set(newProfile);
+      setProfile(newProfile);
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde du profil:', error);
+    }
+  };
+
+  const calculateSavings = () => {
+    const dailySavings = profile.cigsPerDay * settings.pricePerCig;
+    const monthlySavings = dailySavings * 30;
+    const yearlySavings = dailySavings * 365;
+    
+    return {
+      daily: Math.round(dailySavings),
+      monthly: Math.round(monthlySavings),
+      yearly: Math.round(yearlySavings),
+    };
+  };
+
+  const getMotivationText = () => {
+    switch (profile.mainMotivation) {
+      case 'health': return 'Pour améliorer ma santé';
+      case 'finance': return 'Pour économiser de l\'argent';
+      case 'family': return 'Pour ma famille et mes proches';
+      case 'sport': return 'Pour améliorer mes performances sportives';
+      case 'independence': return 'Pour retrouver ma liberté';
+      default: return 'Non spécifié';
+    }
+  };
+
+  const getSmokingTimeText = () => {
+    switch (profile.smokingPeakTime) {
+      case 'morning': return 'Le matin au réveil';
+      case 'after_meals': return 'Après les repas';
+      case 'evening': return 'En soirée';
+      case 'all_day': return 'Tout au long de la journée';
+      case 'work_breaks': return 'Pendant les pauses au travail';
+      default: return 'Non spécifié';
+    }
   };
 
   const exportData = async () => {
@@ -339,41 +402,81 @@ export default function SettingsTab() {
 
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#0a0a0a', '#1a1a2e', '#16213e', '#0f3460']}
-        style={styles.gradientContainer}
-      >
-        {/* Fond étoilé */}
-        <View style={styles.starryBackground}>
-          {Array.from({ length: 20 }).map((_, i) => {
-            const positions = [
-              { left: 10, top: 15 }, { left: 25, top: 8 }, { left: 40, top: 20 }, { left: 60, top: 12 }, { left: 80, top: 18 },
-              { left: 90, top: 25 }, { left: 15, top: 35 }, { left: 35, top: 40 }, { left: 55, top: 32 }, { left: 75, top: 38 },
-              { left: 85, top: 45 }, { left: 20, top: 55 }, { left: 45, top: 60 }, { left: 65, top: 52 }, { left: 85, top: 58 },
-              { left: 12, top: 70 }, { left: 30, top: 75 }, { left: 50, top: 68 }, { left: 70, top: 72 }, { left: 88, top: 78 }
-            ];
-            
-            const pos = positions[i % positions.length];
-            const size = Math.random() * 3 + 2;
-            
-            return (
-              <View
-                key={i}
-                style={[
-                  styles.star,
-                  {
-                    left: pos.left + '%' as any,
-                    top: pos.top + '%' as any,
-                    width: size,
-                    height: size,
-                  },
-                ]}
-              />
-            );
-          })}
-        </View>
+    <StarryBackground>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        
+        {/* Section Profil */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>👤 Mon Profil</Text>
+          
+          <View style={styles.settingGroup}>
+            <Text style={styles.settingLabel}>Années de tabac</Text>
+            <View style={styles.settingRow}>
+              <Text style={styles.settingValue}>{profile.smokingYears || profile.startedSmokingYears} ans</Text>
+              <TouchableOpacity style={styles.editButton}>
+                <Text style={styles.editButtonText}>Modifier</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.settingGroup}>
+            <Text style={styles.settingLabel}>Cigarettes par jour</Text>
+            <View style={styles.settingRow}>
+              <Text style={styles.settingValue}>{profile.cigsPerDay} cigarettes</Text>
+              <TouchableOpacity style={styles.editButton}>
+                <Text style={styles.editButtonText}>Modifier</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.settingGroup}>
+            <Text style={styles.settingLabel}>Objectif principal</Text>
+            <View style={styles.settingRow}>
+              <Text style={styles.settingValue}>
+                {profile.objectiveType === 'complete' ? 'Arrêt complet' : 'Réduction progressive'}
+              </Text>
+              <TouchableOpacity style={styles.editButton}>
+                <Text style={styles.editButtonText}>Modifier</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.settingGroup}>
+            <Text style={styles.settingLabel}>Motivation principale</Text>
+            <View style={styles.infoContainer}>
+              <Text style={styles.infoText}>{getMotivationText()}</Text>
+            </View>
+          </View>
+
+          <View style={styles.settingGroup}>
+            <Text style={styles.settingLabel}>Moment de consommation</Text>
+            <View style={styles.infoContainer}>
+              <Text style={styles.infoText}>{getSmokingTimeText()}</Text>
+            </View>
+          </View>
+
+          {/* Économies potentielles */}
+          <View style={styles.savingsSection}>
+            <Text style={styles.settingLabel}>💰 Mes Économies Potentielles</Text>
+            <View style={styles.savingsGrid}>
+              <View style={styles.savingsItem}>
+                <Text style={styles.savingsAmount}>{calculateSavings().daily}€</Text>
+                <Text style={styles.savingsPeriod}>par jour</Text>
+              </View>
+              
+              <View style={styles.savingsItem}>
+                <Text style={styles.savingsAmount}>{calculateSavings().monthly}€</Text>
+                <Text style={styles.savingsPeriod}>par mois</Text>
+              </View>
+              
+              <View style={styles.savingsItem}>
+                <Text style={styles.savingsAmount}>{calculateSavings().yearly}€</Text>
+                <Text style={styles.savingsPeriod}>par an</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
         {/* Section Paramètres */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>⚙️ Paramètres</Text>
@@ -739,8 +842,7 @@ export default function SettingsTab() {
             </View>
           </View>
         </Modal>
-      </LinearGradient>
-    </View>
+    </StarryBackground>
   );
 }
 
@@ -1121,5 +1223,52 @@ const styles = StyleSheet.create({
     color: '#F8FAFC',
     fontSize: 16,
     marginBottom: 25,
+  },
+  infoContainer: {
+    backgroundColor: 'rgba(139, 69, 255, 0.2)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 69, 255, 0.3)',
+  },
+  infoText: {
+    color: '#E2E8F0',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  savingsSection: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 12,
+    padding: 15,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  savingsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  savingsItem: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  savingsAmount: {
+    color: '#10B981',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  savingsPeriod: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '500',
   },
 });

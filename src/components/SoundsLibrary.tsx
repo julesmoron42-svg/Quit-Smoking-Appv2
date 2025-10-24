@@ -603,8 +603,8 @@ const styles = StyleSheet.create({
   },
   soundCardSelected: {
     backgroundColor: 'rgba(59,130,246,0.15)',
-    borderColor: '#3B82F6',
-    shadowColor: '#3B82F6',
+    borderColor: '#8B5CF6',
+    shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#8B5CF6',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -692,7 +692,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#8B5CF6',
     borderRadius: 2,
   },
   controlsRow: {
@@ -710,7 +710,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
   },
   playButtonMain: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#8B5CF6',
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -740,7 +740,7 @@ const styles = StyleSheet.create({
   },
   volumeFill: {
     height: '100%',
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#8B5CF6',
     borderRadius: 2,
   },
   volumeValue: {

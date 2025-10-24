@@ -12,6 +12,7 @@ import {
   Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import StarryBackground from '../components/StarryBackground';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Svg, { Line, Polyline, Text as SvgText, G, Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
@@ -341,39 +342,7 @@ function CigarettesScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#0a0a0a', '#1a1a2e', '#16213e', '#0f3460']}
-        style={styles.gradientContainer}
-      >
-        {/* Fond étoilé */}
-        <View style={styles.starryBackground}>
-          {Array.from({ length: 20 }).map((_, i) => {
-            const positions = [
-              { left: 10, top: 15 }, { left: 25, top: 8 }, { left: 40, top: 20 }, { left: 60, top: 12 }, { left: 80, top: 18 },
-              { left: 90, top: 25 }, { left: 15, top: 35 }, { left: 35, top: 40 }, { left: 55, top: 32 }, { left: 75, top: 38 },
-              { left: 85, top: 45 }, { left: 20, top: 55 }, { left: 45, top: 60 }, { left: 65, top: 52 }, { left: 85, top: 58 },
-              { left: 12, top: 70 }, { left: 30, top: 75 }, { left: 50, top: 68 }, { left: 70, top: 72 }, { left: 88, top: 78 }
-            ];
-            
-            const pos = positions[i % positions.length];
-            const size = Math.random() * 3 + 2;
-            
-            return (
-              <View
-                key={i}
-                style={[
-                  styles.star,
-                  {
-                    left: pos.left + '%' as any,
-                    top: pos.top + '%' as any,
-                    width: size,
-                    height: size,
-                  },
-                ]}
-              />
-            );
-          })}
-        </View>
+      <StarryBackground>
         
         <TouchableWithoutFeedback onPress={() => cursorPosition && setCursorPosition(null)}>
           <View style={styles.container}>
@@ -502,7 +471,7 @@ function CigarettesScreen() {
             </ScrollView>
           </View>
         </TouchableWithoutFeedback>
-      </LinearGradient>
+      </StarryBackground>
     </View>
   );
 }
@@ -611,39 +580,7 @@ function SavingsScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#0a0a0a', '#1a1a2e', '#16213e', '#0f3460']}
-        style={styles.gradientContainer}
-      >
-        {/* Fond étoilé */}
-        <View style={styles.starryBackground}>
-          {Array.from({ length: 20 }).map((_, i) => {
-            const positions = [
-              { left: 10, top: 15 }, { left: 25, top: 8 }, { left: 40, top: 20 }, { left: 60, top: 12 }, { left: 80, top: 18 },
-              { left: 90, top: 25 }, { left: 15, top: 35 }, { left: 35, top: 40 }, { left: 55, top: 32 }, { left: 75, top: 38 },
-              { left: 85, top: 45 }, { left: 20, top: 55 }, { left: 45, top: 60 }, { left: 65, top: 52 }, { left: 85, top: 58 },
-              { left: 12, top: 70 }, { left: 30, top: 75 }, { left: 50, top: 68 }, { left: 70, top: 72 }, { left: 88, top: 78 }
-            ];
-            
-            const pos = positions[i % positions.length];
-            const size = Math.random() * 3 + 2;
-            
-            return (
-              <View
-                key={i}
-                style={[
-                  styles.star,
-                  {
-                    left: pos.left + '%' as any,
-                    top: pos.top + '%' as any,
-                    width: size,
-                    height: size,
-                  },
-                ]}
-              />
-            );
-          })}
-        </View>
+      <StarryBackground>
         
         <View style={styles.container}>
           <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -794,7 +731,7 @@ function SavingsScreen() {
           </View>
         </ScrollView>
         </View>
-      </LinearGradient>
+      </StarryBackground>
     </View>
   );
 }
@@ -842,39 +779,7 @@ function HealthScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#0a0a0a', '#1a1a2e', '#16213e', '#0f3460']}
-        style={styles.gradientContainer}
-      >
-        {/* Fond étoilé */}
-        <View style={styles.starryBackground}>
-          {Array.from({ length: 20 }).map((_, i) => {
-            const positions = [
-              { left: 10, top: 15 }, { left: 25, top: 8 }, { left: 40, top: 20 }, { left: 60, top: 12 }, { left: 80, top: 18 },
-              { left: 90, top: 25 }, { left: 15, top: 35 }, { left: 35, top: 40 }, { left: 55, top: 32 }, { left: 75, top: 38 },
-              { left: 85, top: 45 }, { left: 20, top: 55 }, { left: 45, top: 60 }, { left: 65, top: 52 }, { left: 85, top: 58 },
-              { left: 12, top: 70 }, { left: 30, top: 75 }, { left: 50, top: 68 }, { left: 70, top: 72 }, { left: 88, top: 78 }
-            ];
-            
-            const pos = positions[i % positions.length];
-            const size = Math.random() * 3 + 2;
-            
-            return (
-              <View
-                key={i}
-                style={[
-                  styles.star,
-                  {
-                    left: pos.left + '%' as any,
-                    top: pos.top + '%' as any,
-                    width: size,
-                    height: size,
-                  },
-                ]}
-              />
-            );
-          })}
-        </View>
+      <StarryBackground>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <Text style={styles.screenTitle}>🏥 Bénéfices Santé</Text>
         <Text style={styles.screenDescription}>
@@ -977,7 +882,7 @@ function HealthScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </LinearGradient>
+    </StarryBackground>
     </View>
   );
 }
@@ -1097,39 +1002,7 @@ function GoalsScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#0a0a0a', '#1a1a2e', '#16213e', '#0f3460']}
-        style={styles.gradientContainer}
-      >
-        {/* Fond étoilé */}
-        <View style={styles.starryBackground}>
-          {Array.from({ length: 20 }).map((_, i) => {
-            const positions = [
-              { left: 10, top: 15 }, { left: 25, top: 8 }, { left: 40, top: 20 }, { left: 60, top: 12 }, { left: 80, top: 18 },
-              { left: 90, top: 25 }, { left: 15, top: 35 }, { left: 35, top: 40 }, { left: 55, top: 32 }, { left: 75, top: 38 },
-              { left: 85, top: 45 }, { left: 20, top: 55 }, { left: 45, top: 60 }, { left: 65, top: 52 }, { left: 85, top: 58 },
-              { left: 12, top: 70 }, { left: 30, top: 75 }, { left: 50, top: 68 }, { left: 70, top: 72 }, { left: 88, top: 78 }
-            ];
-            
-            const pos = positions[i % positions.length];
-            const size = Math.random() * 3 + 2;
-            
-            return (
-              <View
-                key={i}
-                style={[
-                  styles.star,
-                  {
-                    left: pos.left + '%' as any,
-                    top: pos.top + '%' as any,
-                    width: size,
-                    height: size,
-                  },
-                ]}
-              />
-            );
-          })}
-        </View>
+      <StarryBackground>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <Text style={styles.screenTitle}>🎯 Objectifs Financiers</Text>
         <Text style={styles.screenDescription}>
@@ -1215,7 +1088,7 @@ function GoalsScreen() {
           })
         )}
         </ScrollView>
-      </LinearGradient>
+      </StarryBackground>
 
       {/* Modal de confirmation de suppression */}
       <Modal
@@ -1275,14 +1148,14 @@ export default function AnalyticsTab({ route }: any) {
       initialRouteName={initialRoute}
       screenOptions={{
         tabBarStyle: {
-          backgroundColor: '#0F172A',
-          borderTopColor: '#1E293B',
+          backgroundColor: '#0a0a0a',
+          borderTopColor: 'rgba(255, 255, 255, 0.1)',
           borderTopWidth: 1,
         },
-        tabBarActiveTintColor: '#8B45FF',
-        tabBarInactiveTintColor: '#64748B',
+        tabBarActiveTintColor: '#8B5CF6',
+        tabBarInactiveTintColor: '#94A3B8',
         tabBarIndicatorStyle: {
-          backgroundColor: '#8B45FF',
+          backgroundColor: '#8B5CF6',
         },
         tabBarLabelStyle: {
           fontSize: 12,
