@@ -11,6 +11,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Audio } from 'expo-av';
 import { soundsLibrary, categoryInfo, SoundTrack } from '../config/soundsConfig';
+import { useSubscription } from '../contexts/SubscriptionContextMock';
 
 const { width, height } = Dimensions.get('window');
 
@@ -21,6 +22,7 @@ interface SoundsLibraryProps {
 
 
 const SoundsLibrary: React.FC<SoundsLibraryProps> = ({ onClose, onStatsUpdate }) => {
+  const { isPremium } = useSubscription();
   const [selectedSound, setSelectedSound] = useState<SoundTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -29,6 +31,23 @@ const SoundsLibrary: React.FC<SoundsLibraryProps> = ({ onClose, onStatsUpdate })
   const [volume, setVolume] = useState(0.7);
   const [hasPlayedSound, setHasPlayedSound] = useState(false);
 
+  // Vérification premium au chargement
+  useEffect(() => {
+    if (!isPremium) {
+      Alert.alert(
+        '🎵 Sons Premium',
+        'Les sons apaisants sont disponibles avec l\'abonnement Premium. Voulez-vous vous abonner ?',
+        [
+          { text: 'Annuler', style: 'cancel', onPress: onClose },
+          { text: 'S\'abonner', onPress: () => {
+            // Ici on pourrait rediriger vers l'onglet Premium
+            onClose();
+          }}
+        ]
+      );
+    }
+  }, [isPremium, onClose]);
+
   // Filtrer les sons par catégorie
   const filteredSounds = selectedCategory === 'all' 
     ? soundsLibrary 
@@ -36,6 +55,21 @@ const SoundsLibrary: React.FC<SoundsLibraryProps> = ({ onClose, onStatsUpdate })
 
   // Charger un son
   const loadSound = async (soundTrack: SoundTrack) => {
+    // Vérification premium avant de charger le son
+    if (!isPremium) {
+      Alert.alert(
+        '🎵 Sons Premium',
+        'Les sons apaisants sont disponibles avec l\'abonnement Premium. Voulez-vous vous abonner ?',
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'S\'abonner', onPress: () => {
+            onClose();
+          }}
+        ]
+      );
+      return;
+    }
+
     try {
       // Arrêter le son actuel s'il y en a un
       if (sound) {
@@ -91,6 +125,21 @@ const SoundsLibrary: React.FC<SoundsLibraryProps> = ({ onClose, onStatsUpdate })
   // Jouer/Pause
   const togglePlayPause = async () => {
     if (!selectedSound || !sound) return;
+    
+    // Vérification premium avant de jouer
+    if (!isPremium) {
+      Alert.alert(
+        '🎵 Sons Premium',
+        'Les sons apaisants sont disponibles avec l\'abonnement Premium. Voulez-vous vous abonner ?',
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'S\'abonner', onPress: () => {
+            onClose();
+          }}
+        ]
+      );
+      return;
+    }
 
     try {
       if (isPlaying) {
@@ -259,6 +308,34 @@ const SoundsLibrary: React.FC<SoundsLibraryProps> = ({ onClose, onStatsUpdate })
         colors={['#071033', '#1E293B', '#0F172A']}
         style={styles.gradient}
       >
+        {/* Overlay premium si non-premium */}
+        {!isPremium && (
+          <View style={styles.premiumOverlay}>
+            <View style={styles.premiumContent}>
+              <Text style={styles.premiumTitle}>🎵 Sons Premium</Text>
+              <Text style={styles.premiumDescription}>
+                Les sons apaisants sont disponibles avec l'abonnement Premium
+              </Text>
+              <TouchableOpacity 
+                style={styles.premiumButton}
+                onPress={() => {
+                  Alert.alert(
+                    '🎵 Sons Premium',
+                    'Les sons apaisants sont disponibles avec l\'abonnement Premium. Voulez-vous vous abonner ?',
+                    [
+                      { text: 'Annuler', style: 'cancel' },
+                      { text: 'S\'abonner', onPress: () => {
+                        onClose();
+                      }}
+                    ]
+                  );
+                }}
+              >
+                <Text style={styles.premiumButtonText}>S'abonner</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
@@ -671,6 +748,54 @@ const styles = StyleSheet.create({
     fontSize: 12,
     minWidth: 35,
     textAlign: 'right',
+  },
+  premiumOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  premiumContent: {
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    borderRadius: 20,
+    padding: 32,
+    marginHorizontal: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    maxWidth: 300,
+  },
+  premiumTitle: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  premiumDescription: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  premiumButton: {
+    backgroundColor: '#8B45FF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 69, 255, 0.4)',
+  },
+  premiumButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

@@ -97,7 +97,6 @@ const BreathingExerciseWithSound: React.FC<BreathingExerciseWithSoundProps> = ({
   };
 
   const [selectedExercise, setSelectedExercise] = useState<keyof typeof breathingExercises>('4-7-8');
-  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const currentExercise = breathingExercises[selectedExercise];
   const phases = currentExercise.phases;
@@ -244,14 +243,81 @@ const BreathingExerciseWithSound: React.FC<BreathingExerciseWithSoundProps> = ({
     opacityAnim.setValue(0.7);
     pulseAnim.setValue(1);
     
-    // Afficher l'overlay de succès
-    setShowSuccessOverlay(true);
+    // Afficher la popup de fin comme pour les sons
+    showSuccessQuestion();
   };
 
   const toggleSound = () => {
     setSoundEnabled(!soundEnabled);
     if (!soundEnabled) {
       speechSynthesis.cancel();
+    }
+  };
+
+  // Fonction pour demander si l'envie a été arrêtée (comme dans SoundsLibrary)
+  const showSuccessQuestion = () => {
+    Alert.alert(
+      '🫁 Session terminée',
+      'Ton exercice de respiration est terminé. L\'envie de fumer a-t-elle disparu ?',
+      [
+        {
+          text: '❌ Non, toujours envie',
+          style: 'destructive',
+          onPress: () => showAnotherBreathingQuestion()
+        },
+        {
+          text: '✅ Oui, envie arrêtée !',
+          style: 'default',
+          onPress: () => updatePanicStats(true)
+        }
+      ]
+    );
+  };
+
+  // Fonction pour proposer un autre exercice de respiration
+  const showAnotherBreathingQuestion = () => {
+    Alert.alert(
+      '🔄 Autre exercice ?',
+      'Veux-tu essayer un autre exercice de respiration ?',
+      [
+        {
+          text: 'Non, merci',
+          style: 'cancel',
+          onPress: () => updatePanicStats(false)
+        },
+        {
+          text: 'Oui, autre exercice',
+          style: 'default',
+          onPress: () => {
+            // Laisser l'utilisateur choisir un autre exercice
+            console.log('Utilisateur veut essayer un autre exercice de respiration');
+          }
+        }
+      ]
+    );
+  };
+
+  // Fonction pour mettre à jour les statistiques de panique
+  const updatePanicStats = (success: boolean) => {
+    if (onStatsUpdate) {
+      onStatsUpdate({
+        panicCount: 1, // Une utilisation du bouton panique
+        successCount: success ? 1 : 0 // Succès ou échec
+      });
+    }
+    
+    if (success) {
+      Alert.alert(
+        '🎉 Bravo !',
+        'Félicitations ! Tu as réussi à surmonter cette envie. Continue comme ça !',
+        [{ text: 'Merci !', onPress: onClose }]
+      );
+    } else {
+      Alert.alert(
+        '💪 Continue !',
+        'Pas de souci, c\'est normal. Chaque tentative compte. Tu peux toujours réessayer !',
+        [{ text: 'D\'accord', onPress: onClose }]
+      );
     }
   };
 
@@ -389,68 +455,6 @@ const BreathingExerciseWithSound: React.FC<BreathingExerciseWithSoundProps> = ({
         )}
       </View>
 
-      {/* Overlay de succès */}
-      {showSuccessOverlay && (
-        <View style={styles.successOverlay}>
-          <View style={styles.successContent}>
-            <Text style={styles.successTitle}>Exercice terminé !</Text>
-            <Text style={styles.successQuestion}>
-              Cet exercice a-t-il arrêté votre envie de fumer ?
-            </Text>
-            
-            {/* Statistiques */}
-            <View style={styles.statsPreview}>
-              <View style={styles.statPreviewRow}>
-                <Text style={styles.statPreviewLabel}>Exercices utilisés :</Text>
-                <Text style={styles.statPreviewValue}>{panicStats.panicCount + 1} fois</Text>
-              </View>
-              <View style={styles.statPreviewRow}>
-                <Text style={styles.statPreviewLabel}>Aidés à résister :</Text>
-                <Text style={styles.statPreviewValue}>{panicStats.successCount} fois</Text>
-              </View>
-            </View>
-            
-            <View style={styles.successButtons}>
-              <TouchableOpacity 
-                style={styles.successButtonNo} 
-                onPress={() => {
-                  setShowSuccessOverlay(false);
-                  const newPanicCount = panicStats.panicCount + 1;
-                  // Mettre à jour les stats dans le parent
-                  if (onStatsUpdate) {
-                    onStatsUpdate({ panicCount: newPanicCount, successCount: panicStats.successCount });
-                  }
-                  // Proposer un autre exercice
-                  Alert.alert(
-                    'Voulez-vous essayer un autre exercice ?',
-                    'Parfois un exercice différent peut être plus efficace.',
-                    [
-                      { text: 'Non, merci', style: 'cancel' },
-                      { text: 'Oui, essayer', onPress: () => setShowStats(false) }
-                    ]
-                  );
-                }}
-              >
-                <Text style={styles.successButtonText}>Non</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.successButtonYes} 
-                onPress={() => {
-                  setShowSuccessOverlay(false);
-                  const newPanicCount = panicStats.panicCount + 1;
-                  const newSuccessCount = panicStats.successCount + 1;
-                  // Mettre à jour les stats dans le parent
-                  if (onStatsUpdate) {
-                    onStatsUpdate({ panicCount: newPanicCount, successCount: newSuccessCount });
-                  }
-                }}
-              >
-                <Text style={styles.successButtonText}>Oui</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
 
       {/* Overlay de statistiques */}
       {showStats && (

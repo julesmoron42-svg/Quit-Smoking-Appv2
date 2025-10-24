@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSubscription } from '../contexts/SubscriptionContextMock';
 import { PREMIUM_FEATURES, SUBSCRIPTION_PLANS } from '../types/subscription';
+import { HapticService } from '../lib/hapticService';
 import PremiumFeatureCard from '../components/PremiumFeatureCard';
 import BreathingExerciseWithSound from '../components/BreathingExerciseWithSound';
 import MeditationExerciseWithSound from '../components/MeditationExerciseWithSound';
@@ -40,18 +41,35 @@ export default function PremiumTab() {
     successCount: 0,
   });
 
-  // Charger les stats depuis le storage au montage
+  // Charger les stats depuis le storage au montage et quand on revient sur l'écran
   useEffect(() => {
     const loadStats = async () => {
       try {
         const stats = await panicStatsStorage.get();
         setPanicStats(stats);
+        console.log('📊 Stats panique chargées:', stats);
       } catch (error) {
         console.log('Erreur lors du chargement des stats:', error);
       }
     };
     loadStats();
   }, []);
+
+  // Recharger les stats quand on revient sur l'écran (quand les modales se ferment)
+  useEffect(() => {
+    if (!showBreathingExercise && !showMeditationExercise && !showSoundsLibrary) {
+      const reloadStats = async () => {
+        try {
+          const stats = await panicStatsStorage.get();
+          setPanicStats(stats);
+          console.log('🔄 Stats panique rechargées:', stats);
+        } catch (error) {
+          console.log('Erreur lors du rechargement des stats:', error);
+        }
+      };
+      reloadStats();
+    }
+  }, [showBreathingExercise, showMeditationExercise, showSoundsLibrary]);
 
 
   const handlePurchase = async () => {
@@ -126,7 +144,11 @@ export default function PremiumTab() {
   };
 
   // Fonction pour mettre à jour les stats
-  const updatePanicStats = async (newStats: PanicStats) => {
+  const updatePanicStats = async (stats: { panicCount: number; successCount: number }) => {
+    const newStats = {
+      panicCount: panicStats.panicCount + stats.panicCount,
+      successCount: panicStats.successCount + stats.successCount,
+    };
     setPanicStats(newStats);
     try {
       await panicStatsStorage.set(newStats);
@@ -135,14 +157,6 @@ export default function PremiumTab() {
     }
   };
 
-  // Fonction pour mettre à jour les stats depuis les sons
-  const updatePanicStatsFromSounds = async (stats: { panicCount: number; successCount: number }) => {
-    const newStats = {
-      panicCount: panicStats.panicCount + stats.panicCount,
-      successCount: panicStats.successCount + stats.successCount,
-    };
-    await updatePanicStats(newStats);
-  };
 
   return (
     <LinearGradient
@@ -189,7 +203,10 @@ export default function PremiumTab() {
         <View style={styles.featuresGrid}>
           <TouchableOpacity 
             style={[styles.featureButton, styles.breathingButton]}
-            onPress={() => handleFeaturePress({ id: 'breathing_exercises', title: 'Respiration' })}
+            onPress={async () => {
+              await HapticService.subtle();
+              handleFeaturePress({ id: 'breathing_exercises', title: 'Respiration' });
+            }}
           >
             <Text style={styles.featureEmoji}>🫁</Text>
             <Text style={styles.featureText}>Respiration</Text>
@@ -197,7 +214,10 @@ export default function PremiumTab() {
           
           <TouchableOpacity 
             style={[styles.featureButton, styles.meditationButton]}
-            onPress={() => handleFeaturePress({ id: 'meditation_library', title: 'Méditation' })}
+            onPress={async () => {
+              await HapticService.subtle();
+              handleFeaturePress({ id: 'meditation_library', title: 'Méditation' });
+            }}
           >
             <Text style={styles.featureEmoji}>🧘</Text>
             <Text style={styles.featureText}>Méditation</Text>
@@ -205,9 +225,9 @@ export default function PremiumTab() {
           
           <TouchableOpacity 
             style={[styles.featureButton, styles.soundsButton]}
-            onPress={() => {
-              console.log('🎵 SON CLIQUE - OUVERTURE DIRECTE');
-              setShowSoundsLibrary(true);
+            onPress={async () => {
+              await HapticService.subtle();
+              handleFeaturePress({ id: 'relaxation_sounds', title: 'Sons' });
             }}
           >
             <Text style={styles.featureEmoji}>🎵</Text>
@@ -216,7 +236,10 @@ export default function PremiumTab() {
           
           <TouchableOpacity 
             style={[styles.featureButton, styles.coachButton]}
-            onPress={() => Alert.alert('Bientôt disponible', 'Le coach IA arrive bientôt !')}
+            onPress={async () => {
+              await HapticService.subtle();
+              Alert.alert('Bientôt disponible', 'Le coach IA arrive bientôt !');
+            }}
           >
             <Text style={styles.featureEmoji}>🤖</Text>
             <Text style={styles.featureText}>Coach IA</Text>
@@ -297,7 +320,7 @@ export default function PremiumTab() {
               console.log('🎵 FERMETURE OVERLAY SONS');
               setShowSoundsLibrary(false);
             }} 
-            onStatsUpdate={updatePanicStatsFromSounds}
+            onStatsUpdate={updatePanicStats}
           />
         </View>
       )}

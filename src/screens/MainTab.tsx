@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { sessionStorage, dailyEntriesStorage, streakStorage, profileStorage, settingsStorage } from '../lib/storage';
 import { notificationService } from '../lib/notificationService';
 import { useSubscription } from '../contexts/SubscriptionContextMock';
+import { HapticService } from '../lib/hapticService';
 import { 
   formatTime, 
   getBallColor, 
@@ -31,7 +32,8 @@ import {
 } from '../utils/calculations';
 import { TimerSession, DailyEntry, StreakData, UserProfile, AppSettings } from '../types';
 import DailyEntryModal from '../components/DailyEntryModal';
-import OnboardingModal, { OnboardingData } from '../components/OnboardingModal';
+import NewOnboardingFlow from '../components/NewOnboardingFlow';
+import { OnboardingQuestionnaireData } from '../types';
 
 const { width } = Dimensions.get('window');
 
@@ -64,6 +66,7 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
     notificationsAllowed: true,
     language: 'fr',
     animationsEnabled: true,
+    hapticsEnabled: true,
   });
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
@@ -74,6 +77,9 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
   }, []);
 
   const handlePanicButton = () => {
+    // Vibration d'erreur pour le bouton panique
+    HapticService.error();
+    
     // TODO: Vérifier si l'utilisateur a le bundle Panique
     Alert.alert(
       '🚨 Bouton Panique',
@@ -86,6 +92,9 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
   };
 
   const handleAITherapistButton = () => {
+    // Vibration de sélection pour le coach IA
+    HapticService.selection();
+    
     // TODO: Vérifier si l'utilisateur a le bundle Coach IA
     Alert.alert(
       '🤖 Coach IA',
@@ -234,6 +243,9 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
 
 
   const handleStart = async () => {
+    // Vibration de succès pour démarrer
+    await HapticService.success();
+    
     const now = Date.now();
     const newSession: TimerSession = {
       isRunning: true,
@@ -246,6 +258,9 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
   };
 
   const handleStop = async () => {
+    // Vibration d'avertissement pour arrêter
+    await HapticService.warning();
+    
     const now = Date.now();
     const elapsedTime = session.startTimestamp ? now - session.startTimestamp + session.elapsedBeforePause : session.elapsedBeforePause;
     
@@ -355,6 +370,9 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
       const dailyAvoided = Math.max(0, profile.cigsPerDay - entry.realCigs);
       const dailySaved = dailyAvoided * settings.pricePerCig;
       
+      // Vibration de confirmation
+      await HapticService.confirmation();
+      
       Alert.alert(
         'Entrée enregistrée !',
         `Aujourd'hui : ${dailyAvoided} cigarette${dailyAvoided > 1 ? 's' : ''} évitée${dailyAvoided > 1 ? 's' : ''} (${dailySaved.toFixed(1)}€ économisé${dailySaved > 1 ? 's' : ''})\n\nTotal : ${cigarettesAvoided} cigarettes évitées, ${moneySaved.toFixed(1)}€ économisés`,
@@ -368,18 +386,26 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
     }
   };
 
-  const handleOnboardingComplete = async (onboardingData: OnboardingData) => {
+  const handleOnboardingComplete = async (onboardingData: OnboardingQuestionnaireData) => {
     try {
       // Mettre à jour le profil avec les données d'onboarding
       const updatedProfile: UserProfile = {
         ...profile,
+        // Nouvelles données d'onboarding
+        age: onboardingData.age,
         smokingYears: onboardingData.smokingYears,
+        firstCigaretteTime: onboardingData.firstCigaretteTime,
         smokingPeakTime: onboardingData.smokingPeakTime,
-        mainGoal: onboardingData.mainGoal,
+        mainGoal: onboardingData.mainGoal as 'complete_stop' | 'progressive_reduction',
         mainMotivation: onboardingData.mainMotivation,
+        smokingTriggers: onboardingData.smokingTriggers as ('stress' | 'boredom' | 'after_meals' | 'evening_alcohol' | 'social' | 'phone_work' | 'routine' | 'driving' | 'coffee_break')[],
+        emotionHelp: onboardingData.emotionHelp,
+        stressLevel: onboardingData.stressLevel,
         previousAttempts: onboardingData.previousAttempts,
-        smokingTriggers: onboardingData.smokingTriggers,
-        smokingSituations: onboardingData.smokingSituations,
+        previousMethods: onboardingData.previousMethods,
+        relapseCause: onboardingData.relapseCause as ('stress_emotion' | 'social' | 'morning_habit' | 'no_motivation' | 'no_support' | 'no_method')[] | undefined,
+        motivationLevel: onboardingData.motivationLevel,
+        wantSupportMessages: onboardingData.wantSupportMessages,
         onboardingCompleted: true,
         // Mettre à jour les valeurs existantes avec les nouvelles données
         cigsPerDay: onboardingData.cigsPerDay,
@@ -388,6 +414,7 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
         objectiveType: onboardingData.mainGoal === 'complete_stop' ? 'complete' : 'progressive',
         // Ajouter les nouvelles données d'objectif
         targetDate: onboardingData.targetDate,
+        reductionFrequency: onboardingData.reductionFrequency,
       };
       
       setProfile(updatedProfile);
@@ -643,12 +670,28 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
             )}
           </View>
 
+          {/* Bouton temporaire pour relancer l'onboarding */}
+          <View style={styles.onboardingDemoContainer}>
+            <TouchableOpacity
+              style={styles.onboardingButton}
+              onPress={async () => {
+                await HapticService.subtle();
+                setOnboardingVisible(true);
+              }}
+            >
+              <Text style={styles.onboardingButtonText}>🔄 Relancer l'onboarding</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Boutons d'action */}
           <View style={styles.buttonsContainer}>
             {/* Bouton Engager/Démarrer */}
             <TouchableOpacity
               style={[styles.actionButton, styles.commitButton]}
-              onPress={session.startTimestamp ? handleStop : handleStart}
+              onPress={async () => {
+                await HapticService.subtle();
+                session.startTimestamp ? handleStop() : handleStart();
+              }}
             >
               <Text style={styles.actionButtonIcon}>
                 {session.startTimestamp ? '✓' : '🚀'}
@@ -661,7 +704,10 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
             {/* Bouton Recommencer */}
             <TouchableOpacity 
               style={[styles.actionButton, styles.restartButton]}
-              onPress={handleRestart}
+              onPress={async () => {
+                await HapticService.subtle();
+                handleRestart();
+              }}
             >
               <Text style={styles.actionButtonIcon}>↻</Text>
               <Text style={styles.actionButtonText}>Recommencer</Text>
@@ -670,7 +716,10 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
             {/* Bouton Panique */}
             <TouchableOpacity
               style={[styles.actionButton, styles.panicButton]}
-              onPress={handlePanicButton}
+              onPress={async () => {
+                await HapticService.subtle();
+                handlePanicButton();
+              }}
             >
               <Text style={styles.actionButtonIcon}>🚨</Text>
               <Text style={styles.actionButtonText}>Panique</Text>
@@ -679,7 +728,10 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
             {/* Bouton Coach IA */}
             <TouchableOpacity
               style={[styles.actionButton, styles.aiTherapistButton]}
-              onPress={handleAITherapistButton}
+              onPress={async () => {
+                await HapticService.subtle();
+                handleAITherapistButton();
+              }}
             >
               <Text style={styles.actionButtonIcon}>💬</Text>
               <Text style={styles.actionButtonText}>Coach IA</Text>
@@ -867,8 +919,8 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
         initialEntry={selectedDate ? dailyEntries[selectedDate] : undefined}
       />
 
-      {/* Modal d'onboarding */}
-      <OnboardingModal
+      {/* Nouveau système d'onboarding */}
+      <NewOnboardingFlow
         visible={onboardingVisible}
         onComplete={handleOnboardingComplete}
       />
@@ -1370,5 +1422,23 @@ const styles = StyleSheet.create({
     color: '#8B45FF',
     fontSize: 12,
     fontStyle: 'italic',
+  },
+  onboardingDemoContainer: {
+    marginBottom: 30,
+    alignItems: 'center',
+  },
+  onboardingButton: {
+    backgroundColor: 'rgba(139, 69, 255, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 69, 255, 0.5)',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  onboardingButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

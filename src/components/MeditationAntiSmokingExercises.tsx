@@ -154,7 +154,6 @@ const MeditationAntiSmokingExercises: React.FC<MeditationAntiSmokingExercisesPro
   };
 
   const [selectedExercise, setSelectedExercise] = useState<keyof typeof meditationExercises>('breathing_awareness');
-  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [currentGuidedText, setCurrentGuidedText] = useState(0);
   
@@ -192,7 +191,7 @@ const MeditationAntiSmokingExercises: React.FC<MeditationAntiSmokingExercisesPro
             const firstPhase = Object.keys(phases)[0] as keyof typeof phases;
             if (nextPhase === firstPhase) {
               setIsActive(false);
-              setShowSuccessOverlay(true);
+              showSuccessQuestion();
               return 0;
             }
             
@@ -278,12 +277,79 @@ const MeditationAntiSmokingExercises: React.FC<MeditationAntiSmokingExercisesPro
     pulseAnim.setValue(1);
     fadeAnim.setValue(0);
     
-    // Afficher l'overlay de succès
-    setShowSuccessOverlay(true);
+    // Afficher la popup de fin comme pour les sons
+    showSuccessQuestion();
   };
 
   const toggleSound = () => {
     setSoundEnabled(!soundEnabled);
+  };
+
+  // Fonction pour demander si l'envie a été arrêtée (comme dans SoundsLibrary)
+  const showSuccessQuestion = () => {
+    Alert.alert(
+      '🧘 Session terminée',
+      'Ta méditation est terminée. L\'envie de fumer a-t-elle disparu ?',
+      [
+        {
+          text: '❌ Non, toujours envie',
+          style: 'destructive',
+          onPress: () => showAnotherMeditationQuestion()
+        },
+        {
+          text: '✅ Oui, envie arrêtée !',
+          style: 'default',
+          onPress: () => updatePanicStats(true)
+        }
+      ]
+    );
+  };
+
+  // Fonction pour proposer une autre méditation
+  const showAnotherMeditationQuestion = () => {
+    Alert.alert(
+      '🔄 Autre méditation ?',
+      'Veux-tu essayer une autre méditation ?',
+      [
+        {
+          text: 'Non, merci',
+          style: 'cancel',
+          onPress: () => updatePanicStats(false)
+        },
+        {
+          text: 'Oui, autre méditation',
+          style: 'default',
+          onPress: () => {
+            // Laisser l'utilisateur choisir une autre méditation
+            console.log('Utilisateur veut essayer une autre méditation');
+          }
+        }
+      ]
+    );
+  };
+
+  // Fonction pour mettre à jour les statistiques de panique
+  const updatePanicStats = (success: boolean) => {
+    if (onStatsUpdate) {
+      onStatsUpdate({
+        panicCount: 1, // Une utilisation du bouton panique
+        successCount: success ? 1 : 0 // Succès ou échec
+      });
+    }
+    
+    if (success) {
+      Alert.alert(
+        '🎉 Bravo !',
+        'Félicitations ! Tu as réussi à surmonter cette envie. Continue comme ça !',
+        [{ text: 'Merci !', onPress: onClose }]
+      );
+    } else {
+      Alert.alert(
+        '💪 Continue !',
+        'Pas de souci, c\'est normal. Chaque tentative compte. Tu peux toujours réessayer !',
+        [{ text: 'D\'accord', onPress: onClose }]
+      );
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -427,65 +493,6 @@ const MeditationAntiSmokingExercises: React.FC<MeditationAntiSmokingExercisesPro
         )}
       </View>
 
-      {/* Overlay de succès */}
-      {showSuccessOverlay && (
-        <View style={styles.successOverlay}>
-          <View style={styles.successContent}>
-            <Text style={styles.successTitle}>Méditation terminée !</Text>
-            <Text style={styles.successQuestion}>
-              Cette méditation a-t-elle aidé à gérer votre envie de fumer ?
-            </Text>
-            
-            {/* Statistiques */}
-            <View style={styles.statsPreview}>
-              <View style={styles.statPreviewRow}>
-                <Text style={styles.statPreviewLabel}>Exercices utilisés :</Text>
-                <Text style={styles.statPreviewValue}>{panicStats.panicCount + 1} fois</Text>
-              </View>
-              <View style={styles.statPreviewRow}>
-                <Text style={styles.statPreviewLabel}>Aidés à résister :</Text>
-                <Text style={styles.statPreviewValue}>{panicStats.successCount} fois</Text>
-              </View>
-            </View>
-            
-            <View style={styles.successButtons}>
-              <TouchableOpacity 
-                style={styles.successButtonNo} 
-                onPress={() => {
-                  setShowSuccessOverlay(false);
-                  const newPanicCount = panicStats.panicCount + 1;
-                  if (onStatsUpdate) {
-                    onStatsUpdate({ panicCount: newPanicCount, successCount: panicStats.successCount });
-                  }
-                  Alert.alert(
-                    'Voulez-vous essayer une autre méditation ?',
-                    'Parfois une approche différente peut être plus efficace.',
-                    [
-                      { text: 'Non, merci', style: 'cancel' },
-                      { text: 'Oui, essayer', onPress: () => setShowStats(false) }
-                    ]
-                  );
-                }}
-              >
-                <Text style={styles.successButtonText}>Non</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.successButtonYes} 
-                onPress={() => {
-                  setShowSuccessOverlay(false);
-                  const newPanicCount = panicStats.panicCount + 1;
-                  const newSuccessCount = panicStats.successCount + 1;
-                  if (onStatsUpdate) {
-                    onStatsUpdate({ panicCount: newPanicCount, successCount: newSuccessCount });
-                  }
-                }}
-              >
-                <Text style={styles.successButtonText}>Oui</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
 
       {/* Overlay de statistiques */}
       {showStats && (

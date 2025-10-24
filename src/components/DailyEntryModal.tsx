@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DailyEntry, EmotionType, EmotionOption } from '../types';
+import { HapticService } from '../lib/hapticService';
+import { SuccessButton, ErrorButton } from './HapticButton';
 
 const { width } = Dimensions.get('window');
 
@@ -139,7 +141,13 @@ export default function DailyEntryModal({
                   day: 'numeric'
                 })}
               </Text>
-              <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <TouchableOpacity 
+                style={styles.closeButton} 
+                onPress={async () => {
+                  await HapticService.light();
+                  onClose();
+                }}
+              >
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -232,7 +240,10 @@ export default function DailyEntryModal({
                           : 'rgba(255, 255, 255, 0.2)',
                       }
                     ]}
-                    onPress={() => setSelectedEmotion(emotion.type)}
+                    onPress={async () => {
+                      await HapticService.selection();
+                      setSelectedEmotion(emotion.type);
+                    }}
                   >
                     <Text style={styles.emotionEmoji}>{emotion.emoji}</Text>
                     <Text style={styles.emotionLabel}>{emotion.label}</Text>
@@ -243,7 +254,13 @@ export default function DailyEntryModal({
 
             {/* Boutons d'action */}
             <View style={styles.buttonsContainer}>
-              <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+              <TouchableOpacity 
+                style={styles.cancelButton} 
+                onPress={async () => {
+                  await HapticService.light();
+                  onClose();
+                }}
+              >
                 <Text style={styles.cancelButtonText}>Annuler</Text>
               </TouchableOpacity>
               
@@ -255,7 +272,14 @@ export default function DailyEntryModal({
                     backgroundColor: motivationalMsg?.color || '#8B45FF'
                   }
                 ]} 
-                onPress={handleSave}
+                onPress={async () => {
+                  if (realCigs && selectedEmotion) {
+                    await HapticService.success();
+                    handleSave();
+                  } else {
+                    await HapticService.error();
+                  }
+                }}
                 disabled={!realCigs || !selectedEmotion}
               >
                 <Text style={styles.saveButtonText}>Enregistrer</Text>

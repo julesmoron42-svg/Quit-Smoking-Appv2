@@ -138,3 +138,5 @@ assets/sounds/
 ---
 
 **🎯 Prochaine étape :** Placez vos fichiers audio dans les dossiers et décommentez la ligne dans `soundsConfig.ts` pour activer la lecture !
+
+

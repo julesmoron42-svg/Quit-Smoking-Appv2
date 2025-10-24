@@ -27,3 +27,5 @@ CREATE POLICY "Users can view their own panic stats" ON user_panic_stats FOR SEL
 CREATE POLICY "Users can update their own panic stats" ON user_panic_stats FOR UPDATE USING (user_id = auth.jwt() ->> 'email');
 CREATE POLICY "Users can insert their own panic stats" ON user_panic_stats FOR INSERT WITH CHECK (user_id = auth.jwt() ->> 'email');
 CREATE POLICY "Users can delete their own panic stats" ON user_panic_stats FOR DELETE USING (user_id = auth.jwt() ->> 'email');
+
+

@@ -7,6 +7,7 @@ import {
   Animated,
   Dimensions,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -291,12 +292,82 @@ const MeditationExerciseWithSound: React.FC<MeditationExerciseWithSoundProps> = 
     scaleAnim.setValue(0.8);
     pulseAnim.setValue(1);
     progressAnim.setValue(0);
+    
+    // Afficher la popup de fin comme pour les sons
+    showSuccessQuestion();
   };
 
   const toggleSound = () => {
     setSoundEnabled(!soundEnabled);
     if (!soundEnabled) {
       speechSynthesis.cancel();
+    }
+  };
+
+  // Fonction pour demander si l'envie a été arrêtée (comme dans SoundsLibrary)
+  const showSuccessQuestion = () => {
+    Alert.alert(
+      '🧘 Session terminée',
+      'Ta méditation est terminée. L\'envie de fumer a-t-elle disparu ?',
+      [
+        {
+          text: '❌ Non, toujours envie',
+          style: 'destructive',
+          onPress: () => showAnotherMeditationQuestion()
+        },
+        {
+          text: '✅ Oui, envie arrêtée !',
+          style: 'default',
+          onPress: () => updatePanicStats(true)
+        }
+      ]
+    );
+  };
+
+  // Fonction pour proposer une autre méditation
+  const showAnotherMeditationQuestion = () => {
+    Alert.alert(
+      '🔄 Autre méditation ?',
+      'Veux-tu essayer une autre méditation ?',
+      [
+        {
+          text: 'Non, merci',
+          style: 'cancel',
+          onPress: () => updatePanicStats(false)
+        },
+        {
+          text: 'Oui, autre méditation',
+          style: 'default',
+          onPress: () => {
+            // Laisser l'utilisateur choisir une autre méditation
+            console.log('Utilisateur veut essayer une autre méditation');
+          }
+        }
+      ]
+    );
+  };
+
+  // Fonction pour mettre à jour les statistiques de panique
+  const updatePanicStats = (success: boolean) => {
+    if (onStatsUpdate) {
+      onStatsUpdate({
+        panicCount: 1, // Une utilisation du bouton panique
+        successCount: success ? 1 : 0 // Succès ou échec
+      });
+    }
+    
+    if (success) {
+      Alert.alert(
+        '🎉 Bravo !',
+        'Félicitations ! Tu as réussi à surmonter cette envie. Continue comme ça !',
+        [{ text: 'Merci !', onPress: onClose }]
+      );
+    } else {
+      Alert.alert(
+        '💪 Continue !',
+        'Pas de souci, c\'est normal. Chaque tentative compte. Tu peux toujours réessayer !',
+        [{ text: 'D\'accord', onPress: onClose }]
+      );
     }
   };
 

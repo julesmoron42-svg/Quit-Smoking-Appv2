@@ -393,12 +393,25 @@ export const checkAndResetStreak = (
   }
   
   const lastEntryDate = new Date(sortedDates[0]);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  
+  // Nouvelle logique : 
+  // - Si on a une entrée hier, on maintient la streak jusqu'à 23h59 d'aujourd'hui
+  // - La streak ne se remet à zéro qu'à 0h01 du jour suivant si aucune saisie n'a été faite pour la journée précédente
+  if (dailyEntries[yesterdayStr]) {
+    // On a une entrée hier, on maintient la streak pour aujourd'hui
+    return { shouldReset: false, daysMissed: 0 };
+  }
+  
+  // Si on n'a pas d'entrée hier, on vérifie combien de jours se sont écoulés
   const daysSinceLastEntry = Math.floor((today.getTime() - lastEntryDate.getTime()) / (24 * 60 * 60 * 1000));
   
-  // Reset seulement si plus de 2 jours se sont écoulés depuis la dernière entrée
-  // Cela laisse du temps jusqu'à 23h59 pour saisir l'entrée du jour
+  // Reset seulement si plus d'un jour s'est écoulé depuis la dernière entrée
+  // Cela permet de maintenir la streak jusqu'à 23h59 de la journée actuelle
   return { 
-    shouldReset: daysSinceLastEntry > 2, 
+    shouldReset: daysSinceLastEntry > 1, 
     daysMissed: daysSinceLastEntry 
   };
 };

@@ -42,6 +42,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   notificationsAllowed: true,
   language: 'fr',
   animationsEnabled: true,
+  hapticsEnabled: true,
 };
 
 const DEFAULT_SESSION: TimerSession = {

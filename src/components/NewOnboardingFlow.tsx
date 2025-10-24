@@ -10,49 +10,55 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { OnboardingStepData, OnboardingQuestionnaireData } from '../types';
+import { HapticService } from '../lib/hapticService';
+import { TypewriterText } from './TypewriterText';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
-export interface OnboardingData {
-  // Section 1: Profil Fumeur
-  smokingYears: number;
-  cigsPerDay: number;
-  firstCigaretteTime: 'less_5min' | '5_30min' | '30_60min' | 'more_60min';
-  smokingPeakTime: 'morning' | 'after_meals' | 'work_breaks' | 'evening_alcohol' | 'all_day';
-  
-  // Section 2: Objectif
-  mainGoal: 'complete_stop' | 'progressive_reduction';
-  targetDate?: string; // Pour arrêt complet
-  reductionFrequency?: number; // Pour réduction progressive (cigarettes par jour)
-  mainMotivation: 'health' | 'finance' | 'family' | 'sport' | 'independence';
-  
-  // Section 3: Habitudes et Déclencheurs
-  smokingTriggers: ('stress' | 'boredom' | 'after_meals' | 'evening_alcohol' | 'social' | 'phone_work' | 'routine')[];
-  emotionHelp: 'stress_anxiety' | 'concentration' | 'boredom' | 'social_pressure' | 'habit';
-  stressLevel: number; // 1-10
-  
-  // Section 4: Historique
-  previousAttempts: 'first_time' | '1_2_times' | 'several_times' | 'relapse_quick';
-  relapseCause?: ('stress_emotion' | 'social' | 'morning_habit' | 'no_motivation' | 'no_support')[]; // Si rechute
-  
-  // Section 5: Motivation & Soutien
-  motivationLevel: number; // 1-10
-  wantSupportMessages: boolean;
-}
-
-interface OnboardingModalProps {
+interface NewOnboardingFlowProps {
   visible: boolean;
-  onComplete: (data: OnboardingData) => void;
+  onComplete: (data: OnboardingQuestionnaireData) => void;
 }
 
-export default function OnboardingModal({ visible, onComplete }: OnboardingModalProps) {
+export default function NewOnboardingFlow({ visible, onComplete }: NewOnboardingFlowProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [data, setData] = useState<Partial<OnboardingData>>({});
+  const [data, setData] = useState<Partial<OnboardingQuestionnaireData>>({});
 
-  const steps = [
+  // Étapes 0-3 : Messages d'accroche
+  const introSteps: OnboardingStepData[] = [
+    {
+      step: 0,
+      title: "Reprends le contrôle",
+      message: "Ta vie sans tabac commence ici.",
+      cta: "Commencer"
+    },
+    {
+      step: 1,
+      title: "Tu ne fumes pas parce que tu le veux",
+      message: "Tu fumes parce que ton cerveau a été programmé. Tu peux reprendre le contrôle.",
+      cta: "Je suis prêt"
+    },
+    {
+      step: 2,
+      title: "Arrêter n'est pas une question de volonté",
+      message: "La nicotine est l'une des substances les plus addictives. Tu n'es pas seul. Tu vas y arriver.",
+      cta: "Continuer"
+    },
+    {
+      step: 3,
+      title: "Ce n'est pas une question de volonté, mais de méthode",
+      message: "Prêt à relever le défi ?",
+      cta: "Donne-moi la méthode"
+    }
+  ];
+
+  // Questionnaire complet (Étape 4)
+  const questionnaireSteps = [
     // Section 1: Profil Fumeur
     { section: 'Profil Fumeur', questions: [
+      { key: 'age', label: 'Quel est votre âge ?', type: 'number', placeholder: 'Ex: 28' },
       { key: 'smokingYears', label: 'Depuis combien d\'années fumez-vous ?', type: 'number', placeholder: 'Ex: 5' },
       { key: 'cigsPerDay', label: 'Combien de cigarettes fumez-vous par jour ?', type: 'slider', min: 0, max: 30, step: 1 },
       { key: 'firstCigaretteTime', label: 'Après votre réveil, combien de temps avant votre première cigarette ?', type: 'select', options: [
@@ -69,14 +75,15 @@ export default function OnboardingModal({ visible, onComplete }: OnboardingModal
         { value: 'all_day', label: 'Tout au long de la journée' }
       ]}
     ]},
-    // Section 2: Objectif
-    { section: 'Objectif', questions: [
+    // Section 2: Objectifs
+    { section: 'Objectifs', questions: [
       { key: 'mainGoal', label: 'Quel est votre objectif principal ?', type: 'select', options: [
         { value: 'complete_stop', label: 'Arrêt complet' },
-        { value: 'progressive_reduction', label: 'Réduction progressive' }
+        { value: 'progressive_reduction', label: 'Réduction progressive' },
+        { value: 'not_sure', label: 'Je ne sais pas encore' }
       ]},
       { key: 'targetDate', label: 'Quand souhaitez-vous arrêter ?', type: 'date', showIf: 'complete_stop' },
-      { key: 'reductionFrequency', label: 'Fréquence de réduction (cigarettes par semaine)', type: 'slider', min: 1, max: 7, step: 1, showIf: 'progressive_reduction' },
+      { key: 'reductionFrequency', label: 'Combien de cigarettes voulez-vous réduire par semaine ?', type: 'slider', min: 1, max: 7, step: 1, showIf: 'progressive_reduction' },
       { key: 'mainMotivation', label: 'Pourquoi souhaitez-vous arrêter ?', type: 'select', options: [
         { value: 'health', label: 'Santé' },
         { value: 'finance', label: 'Argent' },
@@ -94,7 +101,9 @@ export default function OnboardingModal({ visible, onComplete }: OnboardingModal
         { value: 'evening_alcohol', label: 'En soirée / alcool' },
         { value: 'social', label: 'Moments sociaux / entre amis' },
         { value: 'phone_work', label: 'Téléphone / travail' },
-        { value: 'routine', label: 'Automatisme / routine' }
+        { value: 'routine', label: 'Automatisme / routine' },
+        { value: 'driving', label: 'En conduisant' },
+        { value: 'coffee_break', label: 'Pause café' }
       ]},
       { key: 'emotionHelp', label: 'Quelle émotion la cigarette vous aide le plus à gérer ?', type: 'select', options: [
         { value: 'stress_anxiety', label: 'Stress / anxiété' },
@@ -113,12 +122,21 @@ export default function OnboardingModal({ visible, onComplete }: OnboardingModal
         { value: 'several_times', label: 'Oui, plusieurs fois' },
         { value: 'relapse_quick', label: 'Oui, mais j\'ai rechuté rapidement' }
       ]},
+      { key: 'previousMethods', label: 'Quelles méthodes avez-vous déjà essayées ? (sélectionnez tout ce qui s\'applique)', type: 'multiselect', options: [
+        { value: 'cold_turkey', label: 'Arrêt brutal' },
+        { value: 'patches', label: 'Patchs' },
+        { value: 'gum', label: 'Gommes à mâcher' },
+        { value: 'vape', label: 'Cigarette électronique' },
+        { value: 'medication', label: 'Médicaments' },
+        { value: 'other', label: 'Autre' }
+      ], showIf: 'not_first_time' },
       { key: 'relapseCause', label: 'Qu\'est-ce qui a causé la reprise ? (sélectionnez tout ce qui s\'applique)', type: 'multiselect', options: [
         { value: 'stress_emotion', label: 'Stress / émotion forte' },
         { value: 'social', label: 'Moments sociaux' },
         { value: 'morning_habit', label: 'Habitude au réveil' },
         { value: 'no_motivation', label: 'Manque de motivation' },
-        { value: 'no_support', label: 'Pas d\'accompagnement / seul' }
+        { value: 'no_support', label: 'Pas d\'accompagnement / seul' },
+        { value: 'no_method', label: 'Mauvaise méthode' }
       ], showIf: 'relapse_quick' }
     ]},
     // Section 5: Motivation & Soutien
@@ -131,12 +149,60 @@ export default function OnboardingModal({ visible, onComplete }: OnboardingModal
     ]}
   ];
 
-  // Filtrer les questions selon les conditions et l'objectif sélectionné
-  const getVisibleQuestions = (stepQuestions: any[]) => {
-    return stepQuestions.filter(question => {
+  const handleNext = () => {
+    if (currentStep < 3) {
+      // Étapes d'introduction
+      setCurrentStep(currentStep + 1);
+    } else if (currentStep === 3) {
+      // Passer au questionnaire
+      setCurrentStep(4);
+      setCurrentQuestionIndex(0);
+    } else {
+      // Dans le questionnaire
+      const currentSection = questionnaireSteps[currentStep - 4];
+      const visibleQuestions = getVisibleQuestions(currentSection.questions);
+      
+      if (currentQuestionIndex < visibleQuestions.length - 1) {
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+      } else if (currentStep < questionnaireSteps.length + 3) {
+        // Passer à la section suivante
+        setCurrentStep(currentStep + 1);
+        setCurrentQuestionIndex(0);
+      } else {
+        // Validation finale
+        if (validateData()) {
+          onComplete(data as OnboardingQuestionnaireData);
+        }
+      }
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep <= 3) {
+      if (currentStep > 0) {
+        setCurrentStep(currentStep - 1);
+      }
+    } else {
+      // Dans le questionnaire
+      if (currentQuestionIndex > 0) {
+        setCurrentQuestionIndex(currentQuestionIndex - 1);
+      } else if (currentStep > 4) {
+        // Retourner à la section précédente
+        setCurrentStep(currentStep - 1);
+        const prevSection = questionnaireSteps[currentStep - 5];
+        const prevVisibleQuestions = getVisibleQuestions(prevSection.questions);
+        setCurrentQuestionIndex(prevVisibleQuestions.length - 1);
+      } else {
+        // Retourner aux étapes d'introduction
+        setCurrentStep(3);
+      }
+    }
+  };
+
+  const getVisibleQuestions = (questions: any[]) => {
+    return questions.filter(question => {
       if (!question.showIf) return true;
       
-      // Conditions pour les questions conditionnelles
       if (question.showIf === 'complete_stop') {
         return data.mainGoal === 'complete_stop';
       }
@@ -146,54 +212,27 @@ export default function OnboardingModal({ visible, onComplete }: OnboardingModal
       if (question.showIf === 'relapse_quick') {
         return data.previousAttempts === 'relapse_quick';
       }
+      if (question.showIf === 'not_first_time') {
+        return data.previousAttempts !== 'first_time';
+      }
       
       return true;
     });
-  };
-
-  const currentStepData = steps[currentStep];
-  const visibleQuestions = getVisibleQuestions(currentStepData.questions);
-  const currentQuestion = visibleQuestions[currentQuestionIndex];
-
-  const handleNext = () => {
-    // Vérifier si on peut passer à la question suivante
-    if (currentQuestionIndex < visibleQuestions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else if (currentStep < steps.length - 1) {
-      // Passer à la section suivante
-      setCurrentStep(currentStep + 1);
-      setCurrentQuestionIndex(0);
-    } else {
-      // Validation finale
-      if (validateData()) {
-        onComplete(data as OnboardingData);
-      }
-    }
-  };
-
-  const handleBack = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
-    } else if (currentStep > 0) {
-      // Retourner à la section précédente
-      const prevStep = currentStep - 1;
-      const prevVisibleQuestions = getVisibleQuestions(steps[prevStep].questions);
-      setCurrentStep(prevStep);
-      setCurrentQuestionIndex(prevVisibleQuestions.length - 1);
-    }
   };
 
   const validateData = (): boolean => {
     console.log('Validation des données onboarding:', data);
     
     // Validation des champs obligatoires de base
+    if (!data.age || data.age < 0) {
+      Alert.alert('Erreur', 'Veuillez entrer un âge valide');
+      return false;
+    }
     if (!data.smokingYears || data.smokingYears < 0) {
-      console.log('Erreur: smokingYears invalide');
       Alert.alert('Erreur', 'Veuillez entrer un nombre d\'années valide');
       return false;
     }
     if (data.cigsPerDay === undefined || data.cigsPerDay < 0) {
-      console.log('Erreur: cigsPerDay invalide');
       Alert.alert('Erreur', 'Veuillez entrer un nombre de cigarettes valide');
       return false;
     }
@@ -202,26 +241,22 @@ export default function OnboardingModal({ visible, onComplete }: OnboardingModal
         !data.emotionHelp || data.stressLevel === undefined || 
         !data.previousAttempts || data.motivationLevel === undefined || 
         data.wantSupportMessages === undefined) {
-      console.log('Erreur: champs obligatoires manquants');
       Alert.alert('Erreur', 'Veuillez répondre à toutes les questions');
       return false;
     }
     
     // Validation conditionnelle selon l'objectif
     if (data.mainGoal === 'complete_stop' && !data.targetDate) {
-      console.log('Erreur: targetDate manquante pour arrêt complet');
       Alert.alert('Erreur', 'Veuillez sélectionner une date d\'arrêt');
       return false;
     }
     if (data.mainGoal === 'progressive_reduction' && (data.reductionFrequency === undefined || data.reductionFrequency < 1)) {
-      console.log('Erreur: reductionFrequency invalide');
       Alert.alert('Erreur', 'Veuillez définir une fréquence de réduction valide (au moins 1 cigarette par semaine)');
       return false;
     }
     
     // Validation conditionnelle pour les causes de rechute
     if (data.previousAttempts === 'relapse_quick' && (!data.relapseCause || data.relapseCause.length === 0)) {
-      console.log('Erreur: relapseCause manquante');
       Alert.alert('Erreur', 'Veuillez indiquer les causes de votre rechute');
       return false;
     }
@@ -237,7 +272,7 @@ export default function OnboardingModal({ visible, onComplete }: OnboardingModal
 
   const handleMultiSelect = (key: string, value: string) => {
     setData(prev => {
-      const currentValues = (prev[key as keyof OnboardingData] as string[]) || [];
+      const currentValues = (prev[key as keyof OnboardingQuestionnaireData] as string[]) || [];
       const newValues = currentValues.includes(value)
         ? currentValues.filter(v => v !== value)
         : [...currentValues, value];
@@ -254,7 +289,7 @@ export default function OnboardingModal({ visible, onComplete }: OnboardingModal
             placeholder={question.placeholder}
             placeholderTextColor="rgba(255, 255, 255, 0.5)"
             keyboardType="numeric"
-            value={data[question.key as keyof OnboardingData]?.toString() || ''}
+            value={data[question.key as keyof OnboardingQuestionnaireData]?.toString() || ''}
             onChangeText={(text) => handleInputChange(question.key, parseInt(text) || 0)}
           />
         );
@@ -265,7 +300,7 @@ export default function OnboardingModal({ visible, onComplete }: OnboardingModal
             style={styles.input}
             placeholder="YYYY-MM-DD"
             placeholderTextColor="rgba(255, 255, 255, 0.5)"
-            value={data[question.key as keyof OnboardingData]?.toString() || ''}
+            value={data[question.key as keyof OnboardingQuestionnaireData]?.toString() || ''}
             onChangeText={(text) => handleInputChange(question.key, text)}
           />
         );
@@ -274,10 +309,9 @@ export default function OnboardingModal({ visible, onComplete }: OnboardingModal
         const min = question.min || 0;
         const max = question.max || 10;
         const step = question.step || 1;
-        const currentValue = data[question.key as keyof OnboardingData] as number || min;
+        const currentValue = data[question.key as keyof OnboardingQuestionnaireData] as number || min;
         
-        // Initialiser la valeur par défaut si elle n'existe pas
-        if (data[question.key as keyof OnboardingData] === undefined) {
+        if (data[question.key as keyof OnboardingQuestionnaireData] === undefined) {
           handleInputChange(question.key, min);
         }
         
@@ -329,13 +363,13 @@ export default function OnboardingModal({ visible, onComplete }: OnboardingModal
                 key={option.value}
                 style={[
                   styles.optionButton,
-                  data[question.key as keyof OnboardingData] === option.value && styles.optionButtonSelected
+                  data[question.key as keyof OnboardingQuestionnaireData] === option.value && styles.optionButtonSelected
                 ]}
                 onPress={() => handleInputChange(question.key, option.value)}
               >
                 <Text style={[
                   styles.optionText,
-                  data[question.key as keyof OnboardingData] === option.value && styles.optionTextSelected
+                  data[question.key as keyof OnboardingQuestionnaireData] === option.value && styles.optionTextSelected
                 ]}>
                   {option.label}
                 </Text>
@@ -345,7 +379,7 @@ export default function OnboardingModal({ visible, onComplete }: OnboardingModal
         );
       
       case 'multiselect':
-        const currentValues = (data[question.key as keyof OnboardingData] as string[]) || [];
+        const currentValues = (data[question.key as keyof OnboardingQuestionnaireData] as string[]) || [];
         return (
           <View style={styles.optionsContainer}>
             {question.options.map((option: any) => (
@@ -379,13 +413,13 @@ export default function OnboardingModal({ visible, onComplete }: OnboardingModal
                 key={option.value.toString()}
                 style={[
                   styles.optionButton,
-                  data[question.key as keyof OnboardingData] === option.value && styles.optionButtonSelected
+                  data[question.key as keyof OnboardingQuestionnaireData] === option.value && styles.optionButtonSelected
                 ]}
                 onPress={() => handleInputChange(question.key, option.value)}
               >
                 <Text style={[
                   styles.optionText,
-                  data[question.key as keyof OnboardingData] === option.value && styles.optionTextSelected
+                  data[question.key as keyof OnboardingQuestionnaireData] === option.value && styles.optionTextSelected
                 ]}>
                   {option.label}
                 </Text>
@@ -440,51 +474,104 @@ export default function OnboardingModal({ visible, onComplete }: OnboardingModal
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.content}>
-            {/* Header */}
-            <View style={styles.header}>
-              <Text style={styles.title}>Bienvenue dans MyQuitZone 🌱</Text>
-              <Text style={styles.subtitle}>
-                Créons votre profil personnalisé pour vous accompagner dans votre parcours
-              </Text>
-            </View>
-
-            {/* Progress indicator */}
-            <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${((currentStep + 1) / steps.length) * 100}%` }]} />
-              </View>
-              <Text style={styles.progressText}>
-                Étape {currentStep + 1} sur {steps.length} - {currentStepData.section}
-              </Text>
-              <Text style={styles.progressSubText}>
-                Question {currentQuestionIndex + 1} sur {visibleQuestions.length}
-              </Text>
-            </View>
-
-            {/* Question */}
-            {currentQuestion && (
-              <View style={styles.questionContainer}>
-                <Text style={styles.questionTitle}>{currentQuestion.label}</Text>
-                <View style={styles.questionContent}>
-                  {renderQuestion(currentQuestion)}
+            {currentStep <= 3 ? (
+              // Étapes d'introduction
+              <View style={styles.introContainer}>
+                <View style={styles.logoContainer}>
+                  <Text style={styles.logo}>🌱</Text>
                 </View>
-              </View>
-            )}
-
-            {/* Navigation buttons */}
-            <View style={styles.navigationContainer}>
-              {currentStep > 0 && (
-                <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-                  <Text style={styles.backButtonText}>← Précédent</Text>
+                <Text style={styles.introTitle}>{introSteps[currentStep].title}</Text>
+                
+                {/* Effet machine à écrire pour les messages de motivation des étapes 0-4 */}
+                {currentStep <= 4 ? (
+                  <TypewriterText
+                    text={introSteps[currentStep].message}
+                    speed={30}
+                    hapticEnabled={false}
+                    style={styles.introMessage}
+                    onComplete={() => {
+                      // Pas de vibration à la fin
+                    }}
+                  />
+                ) : (
+                  <Text style={styles.introMessage}>{introSteps[currentStep].message}</Text>
+                )}
+                
+                <TouchableOpacity 
+                  style={styles.ctaButton} 
+                  onPress={async () => {
+                    await HapticService.subtle();
+                    handleNext();
+                  }}
+                >
+                  <Text style={styles.ctaButtonText}>{introSteps[currentStep].cta}</Text>
                 </TouchableOpacity>
-              )}
-              
-              <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-                <Text style={styles.nextButtonText}>
-                  {currentStep === steps.length - 1 ? 'Terminer' : 'Suivant →'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+              </View>
+            ) : (
+              // Questionnaire
+              <>
+                {/* Header */}
+                <View style={styles.header}>
+                  <Text style={styles.title}>Créons votre profil personnalisé</Text>
+                  <Text style={styles.subtitle}>
+                    Ces informations nous permettront de vous proposer le plan de sevrage le plus adapté
+                  </Text>
+                </View>
+
+                {/* Progress indicator */}
+                <View style={styles.progressContainer}>
+                  <View style={styles.progressBar}>
+                    <View style={[styles.progressFill, { width: `${((currentStep - 3) / questionnaireSteps.length) * 100}%` }]} />
+                  </View>
+                  <Text style={styles.progressText}>
+                    Section {currentStep - 3} sur {questionnaireSteps.length} - {questionnaireSteps[currentStep - 4]?.section}
+                  </Text>
+                </View>
+
+                {/* Question */}
+                {(() => {
+                  const currentSection = questionnaireSteps[currentStep - 4];
+                  const visibleQuestions = getVisibleQuestions(currentSection.questions);
+                  const currentQuestion = visibleQuestions[currentQuestionIndex];
+                  
+                  return currentQuestion && (
+                    <View style={styles.questionContainer}>
+                      <Text style={styles.questionTitle}>{currentQuestion.label}</Text>
+                      <View style={styles.questionContent}>
+                        {renderQuestion(currentQuestion)}
+                      </View>
+                    </View>
+                  );
+                })()}
+
+                {/* Navigation buttons */}
+                <View style={styles.navigationContainer}>
+                  {(currentStep > 0 || currentQuestionIndex > 0) && (
+                    <TouchableOpacity 
+                      style={styles.backButton} 
+                      onPress={async () => {
+                        await HapticService.subtle();
+                        handleBack();
+                      }}
+                    >
+                      <Text style={styles.backButtonText}>← Précédent</Text>
+                    </TouchableOpacity>
+                  )}
+                  
+                  <TouchableOpacity 
+                    style={styles.nextButton} 
+                    onPress={async () => {
+                      await HapticService.subtle();
+                      handleNext();
+                    }}
+                  >
+                    <Text style={styles.nextButtonText}>
+                      {currentStep === questionnaireSteps.length + 3 ? 'Terminer' : 'Suivant →'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         </ScrollView>
       </LinearGradient>
@@ -530,7 +617,70 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 40,
+    minHeight: height,
   },
+  // Styles pour les étapes d'introduction
+  introContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 60,
+  },
+  logoContainer: {
+    marginBottom: 40,
+  },
+  logo: {
+    fontSize: 80,
+    textAlign: 'center',
+  },
+  introTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 20,
+    textShadowColor: '#8B45FF',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
+  introMessage: {
+    fontSize: 18,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    lineHeight: 26,
+    marginTop: 20,
+    marginBottom: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: '#8B45FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  ctaButton: {
+    backgroundColor: 'rgba(139, 69, 255, 0.8)',
+    borderRadius: 16,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 69, 255, 0.5)',
+    shadowColor: '#8B45FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  ctaButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  // Styles pour le questionnaire
   header: {
     alignItems: 'center',
     marginBottom: 40,
@@ -570,12 +720,6 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 14,
     textAlign: 'center',
-  },
-  progressSubText: {
-    color: '#64748B',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 2,
   },
   questionContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',

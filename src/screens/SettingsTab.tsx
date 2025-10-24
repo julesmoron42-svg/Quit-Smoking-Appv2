@@ -29,6 +29,7 @@ export default function SettingsTab() {
     notificationsAllowed: true,
     language: 'fr',
     animationsEnabled: true,
+    hapticsEnabled: true,
   });
   const [notificationSettings, setNotificationSettings] = useState({
     enabled: false,
@@ -427,6 +428,33 @@ export default function SettingsTab() {
               trackColor={{ false: '#64748B', true: '#8B45FF' }}
               thumbColor={settings.animationsEnabled ? '#F8FAFC' : '#F8FAFC'}
             />
+          </View>
+
+          {/* Section Vibrations */}
+          <View style={styles.settingGroup}>
+            <Text style={styles.settingLabel}>📳 Vibrations</Text>
+            
+            <View style={styles.switchGroup}>
+              <View style={styles.switchInfo}>
+                <Text style={styles.switchLabel}>Vibrations haptiques</Text>
+                <Text style={styles.switchDescription}>
+                  Activer les vibrations lors des interactions
+                </Text>
+              </View>
+              <Switch
+                value={settings.hapticsEnabled}
+                onValueChange={async (value) => {
+                  const newSettings = {
+                    ...settings,
+                    hapticsEnabled: value,
+                  };
+                  setSettings(newSettings);
+                  await saveSettings(newSettings);
+                }}
+                trackColor={{ false: '#64748B', true: '#8B45FF' }}
+                thumbColor={settings.hapticsEnabled ? '#F8FAFC' : '#F8FAFC'}
+              />
+            </View>
           </View>
 
           {/* Section Notifications */}
