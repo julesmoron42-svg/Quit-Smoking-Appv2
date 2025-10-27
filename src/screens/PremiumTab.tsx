@@ -163,14 +163,6 @@ export default function PremiumTab() {
     <StarryBackground>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>🚨 Zone de Panique</Text>
-          <Text style={styles.subtitle}>
-            Outils d'urgence pour gérer tes envies
-          </Text>
-        </View>
-
         {/* Section d'urgence */}
         <View style={styles.emergencySection}>
           <Text style={styles.emergencyTitle}>💪 Tu peux le faire !</Text>

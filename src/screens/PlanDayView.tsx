@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { PlanDay } from '../data/planContent';
 import { HapticService } from '../lib/hapticService';
+import { planValidationsStorage } from '../lib/storage';
 
 const { width } = Dimensions.get('window');
 
@@ -23,6 +24,7 @@ interface PlanDayViewProps {
   onPrevious: () => void;
   canGoNext: boolean;
   canGoPrevious: boolean;
+  onDayCompleted?: (dayNumber: number) => void;
 }
 
 export default function PlanDayView({
@@ -33,9 +35,25 @@ export default function PlanDayView({
   onPrevious,
   canGoNext,
   canGoPrevious,
+  onDayCompleted,
 }: PlanDayViewProps) {
   const [hasCompletedAction, setHasCompletedAction] = useState(false);
   const [hasPronouncedAllegiance, setHasPronouncedAllegiance] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+
+  useEffect(() => {
+    checkDayValidationStatus();
+  }, [day.jour, planId]);
+
+  const checkDayValidationStatus = async () => {
+    try {
+      const validatedDays = await planValidationsStorage.getValidatedDays(planId);
+      const isDayValidated = validatedDays.includes(day.jour);
+      setHasPronouncedAllegiance(isDayValidated);
+    } catch (error) {
+      console.error('Erreur lors de la vérification du statut de validation:', error);
+    }
+  };
 
   const handleCompleteAction = async () => {
     await HapticService.success();
@@ -48,13 +66,38 @@ export default function PlanDayView({
   };
 
   const handleAllegiance = async () => {
+    if (hasPronouncedAllegiance || isValidating) {
+      return; // Empêcher le re-clic
+    }
+
+    setIsValidating(true);
     await HapticService.success();
-    setHasPronouncedAllegiance(true);
-    Alert.alert(
-      '✨ Engagement confirmé !',
-      'Votre engagement est enregistré. Vous pouvez maintenant accéder aux autres jours de votre plan.',
-      [{ text: 'Parfait !', style: 'default' }]
-    );
+    
+    // Vérifier si on peut valider ce jour
+    const canValidate = await planValidationsStorage.canValidateDay(planId, day.jour);
+    
+    if (canValidate) {
+      // Marquer le jour comme terminé
+      if (onDayCompleted) {
+        onDayCompleted(day.jour);
+      }
+      
+      setHasPronouncedAllegiance(true);
+      
+      Alert.alert(
+        '🎉 Bravo !',
+        `Tu as accompli le jour ${day.jour} ! Reviens demain pour découvrir les actions à mener pour le jour ${day.jour + 1}.`,
+        [{ text: 'Parfait !', style: 'default' }]
+      );
+    } else {
+      Alert.alert(
+        '⏰ Patience !',
+        'Tu ne peux valider qu\'un jour par jour. Reviens demain pour continuer ton parcours.',
+        [{ text: 'Compris !', style: 'default' }]
+      );
+    }
+    
+    setIsValidating(false);
   };
 
   return (
@@ -103,10 +146,15 @@ export default function PlanDayView({
             {/* Action du jour - Section principale */}
             <View style={styles.mainActionSection}>
               <View style={styles.sectionHeader}>
-                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                <Ionicons name="checkmark-circle" size={24} color="#10B981" />
                 <Text style={styles.sectionTitle}>Action du jour</Text>
               </View>
               <Text style={styles.mainActionText}>{day.action}</Text>
+              <View style={styles.actionDetails}>
+                <Text style={styles.actionDetailsText}>
+                  💡 Cette action t'aide à progresser vers ton objectif : {day.objectif}
+                </Text>
+              </View>
             </View>
 
             {/* Info santé et motivation côte à côte */}
@@ -128,51 +176,56 @@ export default function PlanDayView({
               </View>
             </View>
 
-            {/* Stats et engagement côte à côte */}
-            <View style={styles.sideBySideSection}>
-              <View style={styles.halfSection}>
-                <View style={styles.sectionHeader}>
-                  <Ionicons name="trending-up" size={18} color="#F59E0B" />
-                  <Text style={styles.sectionTitle}>Progrès</Text>
-                </View>
-                <Text style={styles.statsText}>{day.stat}</Text>
+            {/* Section Progrès - pleine largeur */}
+            <View style={styles.fullWidthSection}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="trending-up" size={20} color="#F59E0B" />
+                <Text style={styles.sectionTitle}>Progrès</Text>
               </View>
+              <Text style={styles.statsText}>{day.stat}</Text>
+            </View>
+
+            {/* Section Engagement - pleine largeur */}
+            <View style={styles.fullWidthSection}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="star" size={20} color="#8B5CF6" />
+                <Text style={styles.sectionTitle}>Engagement</Text>
+              </View>
+              <Text style={styles.engagementText}>{day.allegeance}</Text>
               
-              <View style={styles.halfSection}>
-                <View style={styles.sectionHeader}>
-                  <Ionicons name="star" size={18} color="#8B5CF6" />
-                  <Text style={styles.sectionTitle}>Engagement</Text>
-                </View>
-                <Text style={styles.engagementText}>{day.allegeance}</Text>
-                
-                {/* Message conditionnel */}
-                {!hasPronouncedAllegiance && (
-                  <Text style={styles.conditionalMessage}>
-                    Si tu as bien accompli les actions du jour {day.jour}, tu peux passer au jour {day.jour + 1}.
-                  </Text>
-                )}
-                
+              {/* Message conditionnel */}
+              {!hasPronouncedAllegiance && (
+                <Text style={styles.conditionalMessage}>
+                  Si tu as bien accompli les actions du jour {day.jour}, tu peux passer au jour {day.jour + 1}.
+                </Text>
+              )}
+              
                 {!hasPronouncedAllegiance && (
                   <TouchableOpacity
-                    style={styles.engagementButton}
+                    style={[
+                      styles.engagementButton,
+                      isValidating && styles.engagementButtonDisabled
+                    ]}
                     onPress={handleAllegiance}
+                    disabled={isValidating}
                   >
                     <LinearGradient
-                      colors={['#8B5CF6', '#7C3AED', '#6D28D9']}
+                      colors={isValidating ? ['#6B7280', '#4B5563'] : ['#8B5CF6', '#7C3AED', '#6D28D9']}
                       style={styles.engagementButtonGradient}
                     >
-                      <Text style={styles.engagementButtonText}>✨ Confirmer</Text>
+                      <Text style={styles.engagementButtonText}>
+                        {isValidating ? '⏳ Validation...' : '✨ Confirmer'}
+                      </Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 )}
-                
-                {hasPronouncedAllegiance && (
-                  <View style={styles.completedIndicator}>
-                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                    <Text style={styles.completedText}>Confirmé !</Text>
-                  </View>
-                )}
-              </View>
+              
+              {hasPronouncedAllegiance && (
+                <View style={styles.completedIndicator}>
+                  <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                  <Text style={styles.completedText}>Confirmé !</Text>
+                </View>
+              )}
             </View>
           </View>
 
@@ -311,10 +364,24 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   mainActionText: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#E2E8F0',
-    lineHeight: 24,
-    fontWeight: '500',
+    lineHeight: 26,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  actionDetails: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  actionDetailsText: {
+    fontSize: 14,
+    color: '#94A3B8',
+    lineHeight: 20,
+    fontStyle: 'italic',
   },
   sideBySideSection: {
     flexDirection: 'row',
@@ -328,16 +395,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
+  fullWidthSection: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    marginBottom: 15,
+  },
   halfSectionText: {
     fontSize: 14,
     color: '#E2E8F0',
     lineHeight: 20,
   },
   statsText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#F59E0B',
     fontWeight: 'bold',
     textAlign: 'center',
+    marginTop: 8,
   },
   engagementText: {
     fontSize: 14,
@@ -362,6 +438,9 @@ const styles = StyleSheet.create({
   engagementButton: {
     borderRadius: 8,
     overflow: 'hidden',
+  },
+  engagementButtonDisabled: {
+    opacity: 0.6,
   },
   engagementButtonGradient: {
     paddingVertical: 10,

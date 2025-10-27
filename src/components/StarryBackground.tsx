@@ -92,3 +92,4 @@ const styles = StyleSheet.create({
   star24: { top: '42%', left: '12%', width: 0.5, height: 0.5 },
   star25: { top: '88%', left: '72%', width: 1, height: 1 },
 });
+

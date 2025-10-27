@@ -177,7 +177,7 @@ function MainApp() {
           component={PremiumTab}
           options={{
             title: '🚬',
-            headerTitle: () => <HeaderLogo title="Premium" />,
+            headerTitle: () => <HeaderLogo title="Espace Sérénité" />,
           }}
         />
         <Tab.Screen 

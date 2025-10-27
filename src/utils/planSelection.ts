@@ -13,7 +13,7 @@ export interface QuitPlan {
 export const QUIT_PLANS: Record<string, QuitPlan> = {
   P1: {
     id: 'P1',
-    name: 'Arrêt Doux',
+    name: '🌱 Libération Douce',
     duration: 7,
     description: '7 jours pour redevenir libre',
     explanation: 'Tu fumes peu et tu es motivé : ton corps peut se libérer en douceur. Ce plan de 7 jours t\'accompagne vers un arrêt rapide et serein.',
@@ -22,7 +22,7 @@ export const QUIT_PLANS: Record<string, QuitPlan> = {
   },
   P2: {
     id: 'P2',
-    name: 'Arrêt Progressif Standard',
+    name: '📈 Transition Progressive',
     duration: 21,
     description: '21 jours pour réduire progressivement',
     explanation: 'Tu veux réduire sans pression et garder le contrôle. Ce plan de 21 jours t\'aide à diminuer étape par étape jusqu\'à l\'arrêt total.',
@@ -31,16 +31,16 @@ export const QUIT_PLANS: Record<string, QuitPlan> = {
   },
   P3: {
     id: 'P3',
-    name: 'Arrêt Progressif Intense',
+    name: '💪 Accompagnement Renforcé',
     duration: 45,
     description: '45 jours pour se libérer durablement',
-    explanation: 'Ta dépendance est forte, mais avec un plan progressif sur 45 jours, tu peux te libérer durablement sans subir le manque.',
+    explanation: 'Ton parcours nécessite un accompagnement plus long. Ce plan de 45 jours t\'aide à te libérer durablement avec patience et bienveillance.',
     color: '#EF4444', // Rouge
     icon: '💪'
   },
   P4: {
     id: 'P4',
-    name: 'Anti-Stress & Respiration',
+    name: '🧘 Gestion du Stress',
     duration: 21,
     description: '21 jours pour gérer le stress naturellement',
     explanation: 'Tu fumes surtout pour évacuer le stress. Ce plan de 21 jours t\'apprend à te calmer naturellement, sans dépendance.',
@@ -49,7 +49,7 @@ export const QUIT_PLANS: Record<string, QuitPlan> = {
   },
   P5: {
     id: 'P5',
-    name: 'Social & Alcool',
+    name: '🎉 Moments Festifs',
     duration: 14,
     description: '14 jours pour gérer les moments festifs',
     explanation: 'Tu fumes surtout en soirée ou avec les autres. Ce plan de 14 jours t\'aide à garder la main, même dans les moments festifs.',
@@ -58,7 +58,7 @@ export const QUIT_PLANS: Record<string, QuitPlan> = {
   },
   P6: {
     id: 'P6',
-    name: 'Focus & Concentration',
+    name: '🎯 Focus & Concentration',
     duration: 21,
     description: '21 jours pour retrouver le focus sans cigarette',
     explanation: 'Tu fumes par habitude, pour faire une pause ou te concentrer. Ce plan de 21 jours t\'aide à retrouver ton focus sans cigarette.',
@@ -164,11 +164,11 @@ export function selectQuitPlan(profile: UserProfile): PlanSelectionResult {
     };
   }
 
-  // 🔸 Fallback: Plan par défaut
-  matchedCriteria.push('Profil moyen - plan équilibré recommandé');
+  // 🔸 Fallback: Plan équilibré
+  matchedCriteria.push('Profil équilibré - approche progressive recommandée');
   return {
     selectedPlan: QUIT_PLANS.P2,
-    reason: 'Plan par défaut - approche progressive sécurisée',
+    reason: 'Approche progressive équilibrée',
     matchedCriteria
   };
 }

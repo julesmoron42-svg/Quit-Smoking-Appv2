@@ -79,8 +79,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (event === 'SIGNED_IN' && session?.user) {
         // Vérifier si c'est un changement d'utilisateur
         if (previousUser && previousUser.email !== session.user.email) {
-          console.log('👤 Changement d\'utilisateur détecté, réinitialisation du chrono');
-          await sessionStorage.resetForNewUser();
+          console.log('👤 Changement d\'utilisateur détecté, réinitialisation complète des données');
+          // Le chrono sera automatiquement réinitialisé par clearLocalDataOnUserChange
+          // qui est appelé lors de la déconnexion précédente
         }
         
         // Demander l'autorisation pour les notifications lors de la première connexion

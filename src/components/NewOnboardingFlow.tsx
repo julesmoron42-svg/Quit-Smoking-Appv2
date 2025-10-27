@@ -15,6 +15,7 @@ import StarryBackground from './StarryBackground';
 import { OnboardingStepData, OnboardingQuestionnaireData } from '../types';
 import { HapticService } from '../lib/hapticService';
 import { TypewriterText } from './TypewriterText';
+import CalendarPicker from './CalendarPicker';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,6 +28,7 @@ export default function NewOnboardingFlow({ visible, onComplete }: NewOnboarding
   const [currentStep, setCurrentStep] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [data, setData] = useState<Partial<OnboardingQuestionnaireData>>({});
+  const [showCalendar, setShowCalendar] = useState(false);
 
   // Étapes 0-3 : Messages d'accroche
   const introSteps: OnboardingStepData[] = [
@@ -151,6 +153,41 @@ export default function NewOnboardingFlow({ visible, onComplete }: NewOnboarding
     ]}
   ];
 
+  // Vérifier si la question actuelle est répondue
+  const isCurrentQuestionAnswered = () => {
+    if (currentStep < 4) return true; // Étapes d'introduction
+    
+    const currentSection = questionnaireSteps[currentStep - 4];
+    const visibleQuestions = getVisibleQuestions(currentSection.questions);
+    const currentQuestion = visibleQuestions[currentQuestionIndex];
+    
+    if (!currentQuestion) return true;
+    
+    const value = data[currentQuestion.key as keyof OnboardingQuestionnaireData];
+    
+    // Vérifications selon le type de question
+    if (currentQuestion.type === 'number') {
+      return value !== undefined && value !== null && value !== '';
+    }
+    if (currentQuestion.type === 'date') {
+      return value !== undefined && value !== null && value !== '';
+    }
+    if (currentQuestion.type === 'slider') {
+      return value !== undefined && value !== null;
+    }
+    if (currentQuestion.type === 'select') {
+      return value !== undefined && value !== null && value !== '';
+    }
+    if (currentQuestion.type === 'multiselect') {
+      return Array.isArray(value) && value.length > 0;
+    }
+    if (currentQuestion.type === 'boolean') {
+      return value !== undefined && value !== null;
+    }
+    
+    return true;
+  };
+
   const handleNext = () => {
     if (currentStep < 3) {
       // Étapes d'introduction
@@ -160,7 +197,12 @@ export default function NewOnboardingFlow({ visible, onComplete }: NewOnboarding
       setCurrentStep(4);
       setCurrentQuestionIndex(0);
     } else {
-      // Dans le questionnaire
+      // Dans le questionnaire - vérifier si la question est répondue
+      if (!isCurrentQuestionAnswered()) {
+        Alert.alert('Question obligatoire', 'Veuillez répondre à cette question avant de continuer.');
+        return;
+      }
+      
       const currentSection = questionnaireSteps[currentStep - 4];
       const visibleQuestions = getVisibleQuestions(currentSection.questions);
       
@@ -297,14 +339,44 @@ export default function NewOnboardingFlow({ visible, onComplete }: NewOnboarding
         );
       
       case 'date':
+        const selectedDate = data[question.key as keyof OnboardingQuestionnaireData]?.toString() || '';
+        const formatDisplayDate = (dateStr: string) => {
+          if (!dateStr) return '';
+          const date = new Date(dateStr);
+          return date.toLocaleDateString('fr-FR', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+        };
+        
         return (
-          <TextInput
-            style={styles.input}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor="rgba(255, 255, 255, 0.5)"
-            value={data[question.key as keyof OnboardingQuestionnaireData]?.toString() || ''}
-            onChangeText={(text) => handleInputChange(question.key, text)}
-          />
+          <View>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => {
+                console.log('📅 Opening calendar...');
+                setShowCalendar(true);
+              }}
+            >
+              <Text style={styles.dateButtonText}>
+                {selectedDate ? formatDisplayDate(selectedDate) : 'Sélectionner une date'}
+              </Text>
+              <Text style={styles.dateButtonIcon}>📅</Text>
+            </TouchableOpacity>
+            
+            {showCalendar && (
+              <CalendarPicker
+                selectedDate={selectedDate}
+                onDateSelect={(date) => {
+                  handleInputChange(question.key, date);
+                  setShowCalendar(false);
+                }}
+                onClose={() => setShowCalendar(false)}
+              />
+            )}
+          </View>
         );
       
       case 'slider':
@@ -532,13 +604,20 @@ export default function NewOnboardingFlow({ visible, onComplete }: NewOnboarding
                   )}
                   
                   <TouchableOpacity 
-                    style={styles.nextButton} 
+                    style={[
+                      styles.nextButton,
+                      !isCurrentQuestionAnswered() && styles.nextButtonDisabled
+                    ]} 
                     onPress={async () => {
                       await HapticService.subtle();
                       handleNext();
                     }}
+                    disabled={!isCurrentQuestionAnswered()}
                   >
-                    <Text style={styles.nextButtonText}>
+                    <Text style={[
+                      styles.nextButtonText,
+                      !isCurrentQuestionAnswered() && styles.nextButtonTextDisabled
+                    ]}>
                       {currentStep === questionnaireSteps.length + 3 ? 'Terminer' : 'Suivant →'}
                     </Text>
                   </TouchableOpacity>
@@ -790,6 +869,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  nextButtonDisabled: {
+    backgroundColor: 'rgba(139, 69, 255, 0.3)',
+    borderColor: 'rgba(139, 69, 255, 0.2)',
+  },
+  nextButtonTextDisabled: {
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
   sliderContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
@@ -832,5 +918,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     minWidth: 40,
     textAlign: 'center',
+  },
+  dateButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  dateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    flex: 1,
+  },
+  dateButtonIcon: {
+    fontSize: 20,
+    marginLeft: 10,
   },
 });

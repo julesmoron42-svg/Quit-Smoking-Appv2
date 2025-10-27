@@ -14,6 +14,8 @@ import { PlanContent, PlanDay } from '../data/planContent';
 interface PlanCalendarViewProps {
   planContent: PlanContent;
   currentDay: number;
+  validatedDays: number[];
+  availableDays: number[];
   onBack: () => void;
   onDaySelect: (day: PlanDay) => void;
 }
@@ -23,20 +25,22 @@ const { width } = Dimensions.get('window');
 export default function PlanCalendarView({
   planContent,
   currentDay,
+  validatedDays,
+  availableDays,
   onBack,
   onDaySelect,
 }: PlanCalendarViewProps) {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   const handleDayPress = (day: PlanDay) => {
-    if (day.jour <= currentDay) {
+    if (availableDays.includes(day.jour)) {
       setSelectedDay(day.jour);
       onDaySelect(day);
     }
   };
 
   const getDayStatus = (dayNumber: number) => {
-    if (dayNumber < currentDay) return 'completed';
+    if (validatedDays.includes(dayNumber)) return 'completed';
     if (dayNumber === currentDay) return 'current';
     return 'future';
   };
@@ -127,7 +131,7 @@ export default function PlanCalendarView({
                 selectedDay === day.jour && styles.selectedDay,
               ]}
               onPress={() => handleDayPress(day)}
-              disabled={day.jour > currentDay}
+              disabled={!availableDays.includes(day.jour)}
             >
               <Text style={[styles.dayNumber, { color: getDayTextColor(day.jour) }]}>
                 {day.jour}
@@ -139,9 +143,9 @@ export default function PlanCalendarView({
                 {day.objectif}
               </Text>
               
-              {day.jour <= currentDay && (
+              {availableDays.includes(day.jour) && (
                 <View style={styles.statusIcon}>
-                  {day.jour < currentDay ? (
+                  {validatedDays.includes(day.jour) ? (
                     <Ionicons name="checkmark-circle" size={20} color="#10B981" />
                   ) : (
                     <Ionicons name="star" size={20} color="#FFD700" />

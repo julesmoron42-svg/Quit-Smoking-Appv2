@@ -25,6 +25,7 @@ const STORAGE_KEYS = {
   PANIC_STATS: '@MyQuitZone:panicStats',
   SYNCED_ENTRIES: '@MyQuitZone:syncedEntries', // Nouvelles entrées synchronisées
   PENDING_SYNC: '@MyQuitZone:pendingSync', // Entrées en attente de synchronisation
+  PLAN_VALIDATIONS: '@MyQuitZone:planValidations', // Validations des jours du plan
 } as const;
 
 // Valeurs par défaut
@@ -60,6 +61,15 @@ const DEFAULT_PANIC_STATS: PanicStats = {
   panicCount: 0,
   successCount: 0,
 };
+
+// Interface pour les validations de plan
+export interface PlanValidation {
+  dayNumber: number;
+  validatedDate: string; // Date au format YYYY-MM-DD
+  planId: string;
+}
+
+const DEFAULT_PLAN_VALIDATIONS: Record<string, PlanValidation[]> = {};
 
 // Stockage adapté selon la plateforme
 const getStorage = () => {
@@ -642,6 +652,185 @@ export const panicStatsStorage = {
   },
 };
 
+export const planValidationsStorage = {
+  async get(): Promise<Record<string, PlanValidation[]>> {
+    // D'abord essayer de charger depuis le stockage local
+    const localValidations = await storage.get(STORAGE_KEYS.PLAN_VALIDATIONS, DEFAULT_PLAN_VALIDATIONS);
+    
+    // Si aucune validation locale, essayer de charger depuis Supabase
+    if (Object.keys(localValidations).length === 0) {
+      const userId = await getCurrentUserId();
+      if (userId) {
+        try {
+          const { DataSyncService } = await import('./dataSync');
+          const { data: remoteValidations } = await DataSyncService.getPlanValidations(userId);
+          if (remoteValidations && Object.keys(remoteValidations).length > 0) {
+            console.log('📥 Validations de plan chargées depuis Supabase:', Object.keys(remoteValidations).length, 'plans');
+            // Sauvegarder localement pour éviter de recharger à chaque fois
+            await storage.set(STORAGE_KEYS.PLAN_VALIDATIONS, remoteValidations);
+            return remoteValidations;
+          }
+        } catch (error) {
+          console.log('⚠️ Impossible de charger les validations de plan depuis Supabase:', error);
+        }
+      }
+    }
+    
+    return localValidations;
+  },
+
+  async set(validations: Record<string, PlanValidation[]>): Promise<void> {
+    // Sauvegarder localement
+    await storage.set(STORAGE_KEYS.PLAN_VALIDATIONS, validations);
+    
+    // Synchroniser avec Supabase
+    const userId = await getCurrentUserId();
+    if (userId) {
+      console.log('💾 Sauvegarde des validations de plan vers Supabase...', validations);
+      try {
+        const { DataSyncService } = require('./dataSync');
+        const result = await DataSyncService.syncPlanValidations(userId, validations);
+        if (result.error) {
+          console.error('❌ Erreur sauvegarde validations de plan:', result.error);
+        } else {
+          console.log('✅ Validations de plan sauvegardées dans Supabase');
+        }
+      } catch (error) {
+        console.error('❌ Erreur lors de la sauvegarde validations de plan:', error);
+      }
+    }
+  },
+
+  async addValidation(planId: string, dayNumber: number): Promise<void> {
+    const validations = await this.get();
+    const today = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
+    
+    if (!validations[planId]) {
+      validations[planId] = [];
+    }
+    
+    // Vérifier si ce jour n'est pas déjà validé aujourd'hui
+    const existingValidation = validations[planId].find(
+      v => v.dayNumber === dayNumber && v.validatedDate === today
+    );
+    
+    if (!existingValidation) {
+      validations[planId].push({
+        dayNumber,
+        validatedDate: today,
+        planId,
+      });
+      
+      await this.set(validations);
+      console.log(`✅ Jour ${dayNumber} du plan ${planId} validé pour le ${today}`);
+    } else {
+      console.log(`⚠️ Jour ${dayNumber} du plan ${planId} déjà validé aujourd'hui`);
+    }
+  },
+
+  async getValidatedDays(planId: string): Promise<number[]> {
+    const validations = await this.get();
+    return validations[planId]?.map(v => v.dayNumber) || [];
+  },
+
+  async getLastValidationDate(planId: string): Promise<string | null> {
+    const validations = await this.get();
+    const planValidations = validations[planId] || [];
+    
+    if (planValidations.length === 0) {
+      return null;
+    }
+    
+    // Trier par date de validation et retourner la plus récente
+    const sortedValidations = planValidations.sort((a, b) => 
+      new Date(b.validatedDate).getTime() - new Date(a.validatedDate).getTime()
+    );
+    
+    return sortedValidations[0].validatedDate;
+  },
+
+  async canValidateDay(planId: string, dayNumber: number): Promise<boolean> {
+    const validations = await this.get();
+    const today = new Date().toISOString().split('T')[0];
+    const lastValidationDate = await this.getLastValidationDate(planId);
+    
+    // Si c'est le premier jour, on peut toujours valider
+    if (dayNumber === 1) {
+      return true;
+    }
+    
+    // Si aucun jour n'a été validé, on ne peut valider que le jour 1
+    if (!lastValidationDate) {
+      return dayNumber === 1;
+    }
+    
+    // Vérifier si le jour précédent a été validé
+    const previousDayValidated = validations[planId]?.some(
+      v => v.dayNumber === dayNumber - 1
+    );
+    
+    if (!previousDayValidated) {
+      return false;
+    }
+    
+    // Vérifier si on peut valider aujourd'hui (pas le même jour que la dernière validation)
+    // Si la dernière validation était hier ou avant, on peut valider
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    
+    return lastValidationDate <= yesterdayStr;
+  },
+
+  async getAvailableDays(planId: string): Promise<number[]> {
+    const validations = await this.get();
+    const planValidations = validations[planId] || [];
+    
+    // Si aucun jour n'a été validé, seul le jour 1 est disponible
+    if (planValidations.length === 0) {
+      return [1];
+    }
+    
+    // Trouver le dernier jour validé
+    const lastValidatedDay = Math.max(...planValidations.map(v => v.dayNumber));
+    
+    // Vérifier si on peut valider le jour suivant aujourd'hui
+    const canValidateNext = await this.canValidateDay(planId, lastValidatedDay + 1);
+    
+    if (canValidateNext) {
+      // On peut valider le jour suivant aujourd'hui - retourner seulement ce jour
+      return [lastValidatedDay + 1];
+    } else {
+      // On ne peut pas encore valider le jour suivant, retourner seulement les jours validés
+      return Array.from({ length: lastValidatedDay }, (_, i) => i + 1);
+    }
+  },
+
+  // Forcer le rechargement des validations depuis Supabase
+  async refresh(): Promise<Record<string, PlanValidation[]>> {
+    const userId = await getCurrentUserId();
+    if (userId) {
+      try {
+        console.log('🔄 Rechargement des validations de plan depuis Supabase...');
+        const { DataSyncService } = await import('./dataSync');
+        const { data: remoteValidations } = await DataSyncService.getPlanValidations(userId);
+        if (remoteValidations && Object.keys(remoteValidations).length > 0) {
+          console.log('📥 Validations de plan rechargées depuis Supabase:', Object.keys(remoteValidations).length, 'plans');
+          // Sauvegarder localement pour éviter de recharger à chaque fois
+          await storage.set(STORAGE_KEYS.PLAN_VALIDATIONS, remoteValidations);
+          return remoteValidations;
+        }
+      } catch (error) {
+        console.log('⚠️ Impossible de recharger les validations de plan depuis Supabase:', error);
+      }
+    }
+    
+    // Fallback sur les données locales si Supabase n'est pas disponible
+    const localValidations = await storage.get(STORAGE_KEYS.PLAN_VALIDATIONS, DEFAULT_PLAN_VALIDATIONS);
+    return localValidations;
+  },
+};
+
 // Fonction d'export de toutes les données
 export const exportAllData = async (): Promise<ExportData> => {
   const [profile, settings, session, dailyEntries, streak, goals, achievements, panicStats] = await Promise.all([
@@ -685,12 +874,12 @@ export const importData = async (data: ExportData): Promise<void> => {
 // Fonction pour nettoyer les données locales lors du changement d'utilisateur
 export const clearLocalDataOnUserChange = async (): Promise<void> => {
   try {
-    // Supprimer toutes les données utilisateur locales SAUF la session (chrono)
-    // La session doit persister même après déconnexion pour maintenir le chrono
+    // Supprimer toutes les données utilisateur locales Y COMPRIS la session (chrono)
+    // Le chrono doit être réinitialisé pour chaque nouvel utilisateur
     await Promise.all([
       storage.remove(STORAGE_KEYS.PROFILE),
       storage.remove(STORAGE_KEYS.SETTINGS),
-      // storage.remove(STORAGE_KEYS.SESSION), // PRÉSERVÉ - Le chrono doit continuer
+      storage.remove(STORAGE_KEYS.SESSION), // Le chrono doit être réinitialisé pour chaque utilisateur
       storage.remove(STORAGE_KEYS.DAILY_ENTRIES),
       storage.remove(STORAGE_KEYS.STREAK),
       storage.remove(STORAGE_KEYS.GOALS),
@@ -698,9 +887,10 @@ export const clearLocalDataOnUserChange = async (): Promise<void> => {
       storage.remove(STORAGE_KEYS.PANIC_STATS),
       storage.remove(STORAGE_KEYS.SYNCED_ENTRIES),
       storage.remove(STORAGE_KEYS.PENDING_SYNC),
+      storage.remove(STORAGE_KEYS.PLAN_VALIDATIONS),
     ]);
     
-    console.log('Données locales nettoyées pour le changement d\'utilisateur (chrono préservé)');
+    console.log('Données locales nettoyées pour le changement d\'utilisateur (chrono réinitialisé)');
   } catch (error) {
     console.error('Erreur lors du nettoyage des données locales:', error);
   }

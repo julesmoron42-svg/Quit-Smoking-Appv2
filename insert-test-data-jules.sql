@@ -154,18 +154,6 @@ INSERT INTO user_streaks (
     current_streak = 40,
     updated_at = NOW();
 
--- Ajouter quelques objectifs financiers
-INSERT INTO financial_goals (
-    user_id,
-    title,
-    price,
-    target_date
-) VALUES 
-    ('jules.moron@gmail.com', 'Nouvelle console de jeu', 500.00, CURRENT_DATE + INTERVAL '3 months'),
-    ('jules.moron@gmail.com', 'Week-end à la montagne', 300.00, CURRENT_DATE + INTERVAL '2 months'),
-    ('jules.moron@gmail.com', 'Nouvelle paire de chaussures', 120.00, CURRENT_DATE + INTERVAL '1 month')
-ON CONFLICT DO NOTHING;
-
 -- Ajouter quelques réalisations débloquées
 INSERT INTO achievements (
     user_id,

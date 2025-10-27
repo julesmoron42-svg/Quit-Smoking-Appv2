@@ -713,19 +713,6 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
             )}
           </View>
 
-          {/* Bouton temporaire pour relancer l'onboarding */}
-          <View style={styles.onboardingDemoContainer}>
-            <TouchableOpacity
-              style={styles.onboardingButton}
-              onPress={async () => {
-                await HapticService.subtle();
-                setOnboardingVisible(true);
-              }}
-            >
-              <Text style={styles.onboardingButtonText}>🔄 Relancer l'onboarding</Text>
-            </TouchableOpacity>
-          </View>
-
           {/* Boutons d'action */}
           <View style={styles.buttonsContainer}>
             {/* Bouton Engager/Démarrer */}
@@ -1467,23 +1454,5 @@ const styles = StyleSheet.create({
     color: '#8B45FF',
     fontSize: 12,
     fontStyle: 'italic',
-  },
-  onboardingDemoContainer: {
-    marginBottom: 30,
-    alignItems: 'center',
-  },
-  onboardingButton: {
-    backgroundColor: 'rgba(139, 69, 255, 0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(139, 69, 255, 0.5)',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-  },
-  onboardingButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
   },
 });

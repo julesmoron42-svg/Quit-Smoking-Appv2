@@ -11,7 +11,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import StarryBackground from '../components/StarryBackground';
 import { Ionicons } from '@expo/vector-icons';
-import { profileStorage } from '../lib/storage';
+import { profileStorage, planValidationsStorage } from '../lib/storage';
 import { UserProfile } from '../types';
 import { HapticService } from '../lib/hapticService';
 import { selectQuitPlan, QUIT_PLANS, QuitPlan, PlanSelectionResult } from '../utils/planSelection';
@@ -33,10 +33,18 @@ export default function QuitPlanTab() {
   const [currentView, setCurrentView] = useState<'main' | 'calendar' | 'day'>('main');
   const [currentDay, setCurrentDay] = useState(0);
   const [selectedDay, setSelectedDay] = useState<PlanDay | null>(null);
+  const [availableDays, setAvailableDays] = useState<number[]>([]);
+  const [validatedDays, setValidatedDays] = useState<number[]>([]);
 
   useEffect(() => {
     loadProfile();
   }, []);
+
+  useEffect(() => {
+    if (planSelection) {
+      loadAvailableDays();
+    }
+  }, [planSelection]);
 
   const loadProfile = async () => {
     try {
@@ -52,6 +60,51 @@ export default function QuitPlanTab() {
     }
   };
 
+  const translateMotivation = (motivation: string | undefined): string => {
+    const translations: Record<string, string> = {
+      'health': 'Santé',
+      'money': 'Économies',
+      'family': 'Famille',
+      'appearance': 'Apparence',
+      'social': 'Social',
+      'performance': 'Performance',
+      'freedom': 'Liberté',
+      'stress': 'Stress',
+      'habit': 'Habitude',
+      'other': 'Autre'
+    };
+    
+    return motivation ? translations[motivation.toLowerCase()] || motivation : 'Santé';
+  };
+
+  const loadAvailableDays = async () => {
+    if (planSelection) {
+      try {
+        // Forcer le rechargement depuis Supabase pour avoir les données les plus récentes
+        const refreshedValidations = await planValidationsStorage.refresh();
+        
+        const available = await planValidationsStorage.getAvailableDays(planSelection.selectedPlan.id);
+        setAvailableDays(available);
+        
+        // Charger les jours validés
+        const validatedDaysList = await planValidationsStorage.getValidatedDays(planSelection.selectedPlan.id);
+        setValidatedDays(validatedDaysList);
+        
+        // Le jour actuel est le premier jour disponible (celui qu'on peut valider aujourd'hui)
+        // Si aucun jour n'est validé, le jour actuel est 1
+        const currentDayNumber = available.length > 0 ? Math.max(...available) : 1;
+        setCurrentDay(currentDayNumber);
+        
+        console.log('📅 Jours disponibles:', available, 'Jour actuel:', currentDayNumber, 'Jours validés:', validatedDaysList);
+      } catch (error) {
+        console.error('Erreur lors du chargement des jours disponibles:', error);
+        setAvailableDays([1]); // Fallback au jour 1
+        setCurrentDay(1);
+        setValidatedDays([]);
+      }
+    }
+  };
+
   const handleStartPlan = async () => {
     await HapticService.success();
     setHasStartedPlan(true);
@@ -59,7 +112,7 @@ export default function QuitPlanTab() {
     if (planSelection) {
       const planContent = getPlanContent(planSelection.selectedPlan.id);
       if (planContent) {
-        const currentDayContent = planContent.jours.find(day => day.jour === currentDay + 1) || planContent.jours[0];
+        const currentDayContent = planContent.jours.find(day => day.jour === currentDay) || planContent.jours[0];
         setSelectedDay(currentDayContent);
         setCurrentView('day');
       }
@@ -72,7 +125,7 @@ export default function QuitPlanTab() {
     if (planSelection) {
       const planContent = getPlanContent(planSelection.selectedPlan.id);
       if (planContent) {
-        const currentDayContent = planContent.jours.find(day => day.jour === currentDay + 1) || planContent.jours[0];
+        const currentDayContent = planContent.jours.find(day => day.jour === currentDay) || planContent.jours[0];
         setSelectedDay(currentDayContent);
         setCurrentView('day');
       }
@@ -114,6 +167,22 @@ export default function QuitPlanTab() {
     }
   };
 
+  const handleDayCompleted = async (dayNumber: number) => {
+    if (planSelection) {
+      try {
+        // Sauvegarder la validation du jour
+        await planValidationsStorage.addValidation(planSelection.selectedPlan.id, dayNumber);
+        
+        // Recharger les jours disponibles
+        await loadAvailableDays();
+        
+        console.log(`✅ Jour ${dayNumber} validé avec succès`);
+      } catch (error) {
+        console.error('Erreur lors de la validation du jour:', error);
+      }
+    }
+  };
+
   // Rendu conditionnel selon la vue actuelle
   if (currentView === 'calendar' && planSelection) {
     const planContent = getPlanContent(planSelection.selectedPlan.id);
@@ -122,6 +191,8 @@ export default function QuitPlanTab() {
         <PlanCalendarView
           planContent={planContent}
           currentDay={currentDay}
+          validatedDays={validatedDays}
+          availableDays={availableDays}
           onBack={handleBackToMain}
           onDaySelect={handleDaySelect}
         />
@@ -141,6 +212,7 @@ export default function QuitPlanTab() {
           onPrevious={handlePreviousDay}
           canGoNext={selectedDay.jour < planContent.jours.length}
           canGoPrevious={selectedDay.jour > 1}
+          onDayCompleted={handleDayCompleted}
         />
       );
     }
@@ -154,11 +226,17 @@ export default function QuitPlanTab() {
           
           {/* Header */}
           <View style={styles.headerSection}>
-            <Text style={styles.headerTitle}>🎯 Mon Plan de Sevrage</Text>
             <Text style={styles.headerSubtitle}>
               Votre parcours personnalisé pour arrêter de fumer
             </Text>
           </View>
+
+          {/* Plan sélectionné - simple */}
+          {planSelection && (
+            <View style={styles.selectedPlanSection}>
+              <Text style={styles.planName}>{planSelection.selectedPlan.name}</Text>
+            </View>
+          )}
 
           {/* Bouton d'accès au plan */}
           <View style={styles.actionButtons}>
@@ -185,75 +263,59 @@ export default function QuitPlanTab() {
             )}
           </View>
 
-          {/* Section profil utilisateur */}
-          <View style={styles.profileSection}>
-            <Text style={styles.sectionTitle}>👤 Votre Profil</Text>
-            
-            <View style={styles.profileGrid}>
-              <View style={styles.profileCard}>
-                <Text style={styles.profileIcon}>🚬</Text>
-                <Text style={styles.profileNumber}>{profile.cigsPerDay}</Text>
-                <Text style={styles.profileLabel}>Cigarettes/jour</Text>
-              </View>
-              
-              <View style={styles.profileCard}>
-                <Text style={styles.profileIcon}>📅</Text>
-                <Text style={styles.profileNumber}>{profile.smokingYears || profile.startedSmokingYears}</Text>
-                <Text style={styles.profileLabel}>Années de tabac</Text>
-              </View>
-              
-              <View style={styles.profileCard}>
-                <Text style={styles.profileIcon}>💪</Text>
-                <Text style={styles.profileNumber}>{profile.motivationLevel || 5}/10</Text>
-                <Text style={styles.profileLabel}>Motivation</Text>
-              </View>
-            </View>
-            
-            {/* Raison principale de l'arrêt */}
-            <View style={styles.motivationBox}>
-              <Text style={styles.motivationLabel}>
-                Raison principale : <Text style={styles.motivationValue}>{profile.mainMotivation || 'Santé'}</Text>
-              </Text>
-            </View>
-          </View>
-
           {/* Calendrier intégré */}
           {planSelection && (
             <View style={styles.calendarSection}>
               <Text style={styles.sectionTitle}>📅 Calendrier du Plan</Text>
               <View style={styles.calendarGrid}>
-                {getPlanContent(planSelection.selectedPlan.id)?.jours.map((day) => (
-                  <TouchableOpacity
-                    key={day.jour}
-                    style={[
-                      styles.dayBox,
-                      day.jour <= currentDay ? styles.completedDay : styles.futureDay
-                    ]}
-                    onPress={() => {
-                      setSelectedDay(day);
-                      setCurrentView('day');
-                    }}
-                    disabled={day.jour > currentDay}
-                  >
-                    <Text style={[
-                      styles.dayNumber,
-                      day.jour <= currentDay ? styles.completedDayNumber : styles.futureDayNumber
-                    ]}>
-                      {day.jour}
-                    </Text>
-                    <Text style={[
-                      styles.dayName,
-                      day.jour <= currentDay ? styles.completedDayText : styles.futureDayText
-                    ]}>
-                      {day.nom}
-                    </Text>
-                    {day.jour <= currentDay && (
-                      <View style={styles.checkIcon}>
-                        <Ionicons name="checkmark" size={12} color="#10B981" />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                ))}
+                {getPlanContent(planSelection.selectedPlan.id)?.jours.map((day) => {
+                  const isCompleted = validatedDays.includes(day.jour);
+                  const isCurrent = day.jour === currentDay;
+                  const isAvailable = availableDays.includes(day.jour);
+                  
+                  return (
+                    <TouchableOpacity
+                      key={day.jour}
+                      style={[
+                        styles.dayBox,
+                        isCompleted ? styles.completedDay : 
+                        isCurrent ? styles.availableDay : styles.futureDay
+                      ]}
+                      onPress={() => {
+                        if (isAvailable) {
+                          setSelectedDay(day);
+                          setCurrentView('day');
+                        }
+                      }}
+                      disabled={!isAvailable}
+                    >
+                      <Text style={[
+                        styles.dayNumber,
+                        isCompleted ? styles.completedDayNumber : 
+                        isCurrent ? styles.availableDayNumber : styles.futureDayNumber
+                      ]}>
+                        {day.jour}
+                      </Text>
+                      <Text style={[
+                        styles.dayName,
+                        isCompleted ? styles.completedDayText : 
+                        isCurrent ? styles.availableDayText : styles.futureDayText
+                      ]}>
+                        {day.nom}
+                      </Text>
+                      {isCompleted && (
+                        <View style={styles.checkIcon}>
+                          <Ionicons name="checkmark" size={12} color="#10B981" />
+                        </View>
+                      )}
+                      {isCurrent && (
+                        <View style={styles.currentIcon}>
+                          <Ionicons name="star" size={12} color="#FFD700" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
           )}
@@ -300,7 +362,7 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 20,
   },
   premiumBadge: {
     backgroundColor: 'rgba(255, 215, 0, 0.2)',
@@ -329,6 +391,16 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     lineHeight: 24,
+  },
+  selectedPlanSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  planName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
   },
   mainPlanCard: {
     backgroundColor: 'rgba(255, 215, 0, 0.15)',
@@ -497,6 +569,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16, 185, 129, 0.2)',
     borderColor: '#10B981',
   },
+  availableDay: {
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    borderColor: '#FFD700',
+  },
   futureDay: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderColor: 'rgba(255, 255, 255, 0.1)',
@@ -510,6 +586,9 @@ const styles = StyleSheet.create({
   completedDayNumber: {
     color: '#10B981',
   },
+  availableDayNumber: {
+    color: '#FFD700',
+  },
   futureDayNumber: {
     color: '#64748B',
   },
@@ -520,10 +599,18 @@ const styles = StyleSheet.create({
   completedDayText: {
     color: '#E2E8F0',
   },
+  availableDayText: {
+    color: '#FFD700',
+  },
   futureDayText: {
     color: '#64748B',
   },
   checkIcon: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+  },
+  currentIcon: {
     position: 'absolute',
     top: 5,
     right: 5,

@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { UserProfile, AppSettings, DailyEntry, FinancialGoal, Achievement, StreakData, TimerSession, HealthBenefit, PanicStats } from '../types';
+import { PlanValidation } from './storage';
 
 export class DataSyncService {
   // Synchroniser le profil utilisateur
@@ -685,6 +686,84 @@ export class DataSyncService {
     } catch (error) {
       console.error('Erreur lors de la synchronisation complète:', error);
       return { success: false, error };
+    }
+  }
+
+  // Synchroniser les validations de plan de sevrage
+  static async syncPlanValidations(userId: string, validations: Record<string, PlanValidation[]>) {
+    try {
+      console.log('💾 Synchronisation des validations de plan pour:', userId);
+      
+      // Supprimer toutes les validations existantes pour cet utilisateur
+      const { error: deleteError } = await supabase
+        .from('plan_validations')
+        .delete()
+        .eq('user_id', userId);
+
+      if (deleteError) {
+        console.warn('⚠️ Erreur lors de la suppression des validations existantes:', deleteError);
+      }
+
+      // Insérer toutes les nouvelles validations
+      const validationsToInsert = [];
+      for (const [planId, planValidations] of Object.entries(validations)) {
+        for (const validation of planValidations) {
+          validationsToInsert.push({
+            user_id: userId,
+            plan_id: validation.planId,
+            day_number: validation.dayNumber,
+            validated_date: validation.validatedDate,
+          });
+        }
+      }
+
+      if (validationsToInsert.length > 0) {
+        const { data, error } = await supabase
+          .from('plan_validations')
+          .insert(validationsToInsert)
+          .select();
+
+        if (error) throw error;
+        console.log(`✅ ${validationsToInsert.length} validations de plan synchronisées`);
+      }
+
+      return { data: validationsToInsert, error: null };
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation des validations de plan:', error);
+      return { data: null, error };
+    }
+  }
+
+  // Récupérer les validations de plan de sevrage
+  static async getPlanValidations(userId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('plan_validations')
+        .select('*')
+        .eq('user_id', userId)
+        .order('validated_date', { ascending: true });
+
+      if (error) throw error;
+
+      // Transformer les données en format attendu par l'app
+      const validations: Record<string, PlanValidation[]> = {};
+      if (data) {
+        for (const row of data) {
+          if (!validations[row.plan_id]) {
+            validations[row.plan_id] = [];
+          }
+          validations[row.plan_id].push({
+            dayNumber: row.day_number,
+            validatedDate: row.validated_date,
+            planId: row.plan_id,
+          });
+        }
+      }
+
+      return { data: validations, error: null };
+    } catch (error) {
+      console.error('Erreur lors de la récupération des validations de plan:', error);
+      return { data: null, error };
     }
   }
 }

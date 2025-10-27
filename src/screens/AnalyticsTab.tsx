@@ -1606,7 +1606,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1844,7 +1844,7 @@ const styles = StyleSheet.create({
   },
   // Styles pour l'overlay de confirmation de suppression
   deleteConfirmationContainer: {
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    backgroundColor: '#0a0a0a',
     borderRadius: 16,
     padding: 24,
     marginHorizontal: 20,
