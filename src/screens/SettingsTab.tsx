@@ -48,8 +48,20 @@ export default function SettingsTab() {
   const [tempMinute, setTempMinute] = useState('00');
   const [showPriceModal, setShowPriceModal] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+  const [showSmokingYearsModal, setShowSmokingYearsModal] = useState(false);
+  const [showCigsPerDayModal, setShowCigsPerDayModal] = useState(false);
+  const [showObjectiveModal, setShowObjectiveModal] = useState(false);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [showReductionFrequencyModal, setShowReductionFrequencyModal] = useState(false);
+  const [showTargetDateModal, setShowTargetDateModal] = useState(false);
   const [tempPrice, setTempPrice] = useState('');
   const [tempCurrency, setTempCurrency] = useState('');
+  const [tempSmokingYears, setTempSmokingYears] = useState('');
+  const [tempCigsPerDay, setTempCigsPerDay] = useState('');
+  const [tempObjective, setTempObjective] = useState('');
+  const [tempLanguage, setTempLanguage] = useState('');
+  const [tempReductionFrequency, setTempReductionFrequency] = useState('');
+  const [tempTargetDate, setTempTargetDate] = useState('');
 
   // Debug: Log de l'état de l'utilisateur
   useEffect(() => {
@@ -117,6 +129,36 @@ export default function SettingsTab() {
     setShowCurrencyModal(true);
   };
 
+  const handleSmokingYearsEdit = () => {
+    setTempSmokingYears((profile.smokingYears || profile.startedSmokingYears).toString());
+    setShowSmokingYearsModal(true);
+  };
+
+  const handleCigsPerDayEdit = () => {
+    setTempCigsPerDay(profile.cigsPerDay.toString());
+    setShowCigsPerDayModal(true);
+  };
+
+  const handleObjectiveEdit = () => {
+    setTempObjective(profile.objectiveType);
+    setShowObjectiveModal(true);
+  };
+
+  const handleLanguageEdit = () => {
+    setTempLanguage(settings.language);
+    setShowLanguageModal(true);
+  };
+
+  const handleReductionFrequencyEdit = () => {
+    setTempReductionFrequency(profile.reductionFrequency?.toString() || '1');
+    setShowReductionFrequencyModal(true);
+  };
+
+  const handleTargetDateEdit = () => {
+    setTempTargetDate(profile.targetDate || '');
+    setShowTargetDateModal(true);
+  };
+
   const savePrice = async () => {
     const newPrice = parseFloat(tempPrice);
     if (isNaN(newPrice) || newPrice <= 0) {
@@ -140,6 +182,83 @@ export default function SettingsTab() {
     setSettings(newSettings);
     await saveSettings(newSettings);
     setShowCurrencyModal(false);
+  };
+
+  const saveSmokingYears = async () => {
+    const newYears = parseInt(tempSmokingYears);
+    if (isNaN(newYears) || newYears < 0 || newYears > 100) {
+      Alert.alert('Erreur', 'Veuillez saisir un nombre d\'années valide (0-100)');
+      return;
+    }
+    
+    const newProfile = { ...profile, smokingYears: newYears };
+    await saveProfile(newProfile);
+    setShowSmokingYearsModal(false);
+  };
+
+  const saveCigsPerDay = async () => {
+    const newCigs = parseInt(tempCigsPerDay);
+    if (isNaN(newCigs) || newCigs < 1 || newCigs > 100) {
+      Alert.alert('Erreur', 'Veuillez saisir un nombre de cigarettes valide (1-100)');
+      return;
+    }
+    
+    const newProfile = { ...profile, cigsPerDay: newCigs };
+    await saveProfile(newProfile);
+    setShowCigsPerDayModal(false);
+  };
+
+  const saveObjective = async () => {
+    if (!tempObjective || !['complete', 'progressive'].includes(tempObjective)) {
+      Alert.alert('Erreur', 'Veuillez sélectionner un objectif valide');
+      return;
+    }
+    
+    const newProfile = { ...profile, objectiveType: tempObjective as 'complete' | 'progressive' };
+    await saveProfile(newProfile);
+    setShowObjectiveModal(false);
+  };
+
+  const saveLanguage = async () => {
+    if (!tempLanguage || !['fr', 'en'].includes(tempLanguage)) {
+      Alert.alert('Erreur', 'Veuillez sélectionner une langue valide');
+      return;
+    }
+    
+    const newSettings = { ...settings, language: tempLanguage as 'fr' | 'en' };
+    setSettings(newSettings);
+    await saveSettings(newSettings);
+    setShowLanguageModal(false);
+  };
+
+  const saveReductionFrequency = async () => {
+    const newFrequency = parseInt(tempReductionFrequency);
+    if (isNaN(newFrequency) || newFrequency < 1 || newFrequency > 50) {
+      Alert.alert('Erreur', 'Veuillez saisir une fréquence de réduction valide (1-50 cigarettes)');
+      return;
+    }
+    
+    const newProfile = { ...profile, reductionFrequency: newFrequency };
+    await saveProfile(newProfile);
+    setShowReductionFrequencyModal(false);
+  };
+
+  const saveTargetDate = async () => {
+    if (!tempTargetDate.trim()) {
+      Alert.alert('Erreur', 'Veuillez saisir une date d\'arrêt valide');
+      return;
+    }
+    
+    // Validation basique de la date
+    const date = new Date(tempTargetDate);
+    if (isNaN(date.getTime())) {
+      Alert.alert('Erreur', 'Format de date invalide');
+      return;
+    }
+    
+    const newProfile = { ...profile, targetDate: tempTargetDate };
+    await saveProfile(newProfile);
+    setShowTargetDateModal(false);
   };
 
   const saveProfile = async (newProfile: UserProfile) => {
@@ -413,7 +532,7 @@ export default function SettingsTab() {
             <Text style={styles.settingLabel}>Années de tabac</Text>
             <View style={styles.settingRow}>
               <Text style={styles.settingValue}>{profile.smokingYears || profile.startedSmokingYears} ans</Text>
-              <TouchableOpacity style={styles.editButton}>
+              <TouchableOpacity style={styles.editButton} onPress={handleSmokingYearsEdit}>
                 <Text style={styles.editButtonText}>Modifier</Text>
               </TouchableOpacity>
             </View>
@@ -423,7 +542,7 @@ export default function SettingsTab() {
             <Text style={styles.settingLabel}>Cigarettes par jour</Text>
             <View style={styles.settingRow}>
               <Text style={styles.settingValue}>{profile.cigsPerDay} cigarettes</Text>
-              <TouchableOpacity style={styles.editButton}>
+              <TouchableOpacity style={styles.editButton} onPress={handleCigsPerDayEdit}>
                 <Text style={styles.editButtonText}>Modifier</Text>
               </TouchableOpacity>
             </View>
@@ -435,11 +554,35 @@ export default function SettingsTab() {
               <Text style={styles.settingValue}>
                 {profile.objectiveType === 'complete' ? 'Arrêt complet' : 'Réduction progressive'}
               </Text>
-              <TouchableOpacity style={styles.editButton}>
+              <TouchableOpacity style={styles.editButton} onPress={handleObjectiveEdit}>
                 <Text style={styles.editButtonText}>Modifier</Text>
               </TouchableOpacity>
             </View>
           </View>
+
+          {profile.objectiveType === 'progressive' && (
+            <View style={styles.settingGroup}>
+              <Text style={styles.settingLabel}>Fréquence de réduction</Text>
+              <View style={styles.settingRow}>
+                <Text style={styles.settingValue}>{profile.reductionFrequency || 1} cigarettes/jour</Text>
+                <TouchableOpacity style={styles.editButton} onPress={handleReductionFrequencyEdit}>
+                  <Text style={styles.editButtonText}>Modifier</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {profile.objectiveType === 'complete' && (
+            <View style={styles.settingGroup}>
+              <Text style={styles.settingLabel}>Date d'arrêt cible</Text>
+              <View style={styles.settingRow}>
+                <Text style={styles.settingValue}>{profile.targetDate || 'Non définie'}</Text>
+                <TouchableOpacity style={styles.editButton} onPress={handleTargetDateEdit}>
+                  <Text style={styles.editButtonText}>Modifier</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           <View style={styles.settingGroup}>
             <Text style={styles.settingLabel}>Motivation principale</Text>
@@ -504,8 +647,8 @@ export default function SettingsTab() {
           <View style={styles.settingGroup}>
             <Text style={styles.settingLabel}>Langue</Text>
             <View style={styles.settingRow}>
-              <Text style={styles.settingValue}>Français</Text>
-              <TouchableOpacity style={styles.editButton}>
+              <Text style={styles.settingValue}>{settings.language === 'fr' ? 'Français' : 'English'}</Text>
+              <TouchableOpacity style={styles.editButton} onPress={handleLanguageEdit}>
                 <Text style={styles.editButtonText}>Modifier</Text>
               </TouchableOpacity>
             </View>
@@ -773,33 +916,35 @@ export default function SettingsTab() {
           onRequestClose={() => setShowPriceModal(false)}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Modifier le prix par cigarette</Text>
-              
-              <TextInput
-                style={styles.modalTextInput}
-                value={tempPrice}
-                onChangeText={setTempPrice}
-                keyboardType="numeric"
-                placeholder="Prix en euros"
-                placeholderTextColor="#64748B"
-              />
-              
-              <View style={styles.modalButtons}>
+            <View style={styles.modalContentNew}>
+              <View style={styles.modalHeader}>
                 <TouchableOpacity 
-                  style={styles.modalCancelButton}
+                  style={styles.modalBackButton}
                   onPress={() => setShowPriceModal(false)}
                 >
-                  <Text style={styles.modalCancelButtonText}>Annuler</Text>
+                  <Text style={styles.modalBackButtonText}>←</Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.modalSaveButton}
-                  onPress={savePrice}
-                >
-                  <Text style={styles.modalSaveButtonText}>Sauvegarder</Text>
-                </TouchableOpacity>
+                <Text style={styles.modalTitleNew}>Modifier le prix par cigarette</Text>
+                <View style={styles.modalHeaderSpacer} />
               </View>
+              
+              <View style={styles.modalBody}>
+                <TextInput
+                  style={styles.modalTextInput}
+                  value={tempPrice}
+                  onChangeText={setTempPrice}
+                  keyboardType="numeric"
+                  placeholder="Prix en euros"
+                  placeholderTextColor="#64748B"
+                />
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.modalSaveButtonFull}
+                onPress={savePrice}
+              >
+                <Text style={styles.modalSaveButtonFullText}>Sauvegarder</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
@@ -812,33 +957,321 @@ export default function SettingsTab() {
           onRequestClose={() => setShowCurrencyModal(false)}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Modifier la devise</Text>
-              
-              <TextInput
-                style={styles.modalTextInput}
-                value={tempCurrency}
-                onChangeText={setTempCurrency}
-                placeholder="Symbole de devise (€, $, £, etc.)"
-                placeholderTextColor="#64748B"
-                maxLength={3}
-              />
-              
-              <View style={styles.modalButtons}>
+            <View style={styles.modalContentNew}>
+              <View style={styles.modalHeader}>
                 <TouchableOpacity 
-                  style={styles.modalCancelButton}
+                  style={styles.modalBackButton}
                   onPress={() => setShowCurrencyModal(false)}
                 >
-                  <Text style={styles.modalCancelButtonText}>Annuler</Text>
+                  <Text style={styles.modalBackButtonText}>←</Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.modalSaveButton}
-                  onPress={saveCurrency}
-                >
-                  <Text style={styles.modalSaveButtonText}>Sauvegarder</Text>
-                </TouchableOpacity>
+                <Text style={styles.modalTitleNew}>Modifier la devise</Text>
+                <View style={styles.modalHeaderSpacer} />
               </View>
+              
+              <View style={styles.modalBody}>
+                <TextInput
+                  style={styles.modalTextInput}
+                  value={tempCurrency}
+                  onChangeText={setTempCurrency}
+                  placeholder="Symbole de devise (€, $, £, etc.)"
+                  placeholderTextColor="#64748B"
+                  maxLength={3}
+                />
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.modalSaveButtonFull}
+                onPress={saveCurrency}
+              >
+                <Text style={styles.modalSaveButtonFullText}>Sauvegarder</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Modal pour modifier les années de tabac */}
+        <Modal
+          visible={showSmokingYearsModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowSmokingYearsModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContentNew}>
+              <View style={styles.modalHeader}>
+                <TouchableOpacity 
+                  style={styles.modalBackButton}
+                  onPress={() => setShowSmokingYearsModal(false)}
+                >
+                  <Text style={styles.modalBackButtonText}>←</Text>
+                </TouchableOpacity>
+                <Text style={styles.modalTitleNew}>Modifier les années de tabac</Text>
+                <View style={styles.modalHeaderSpacer} />
+              </View>
+              
+              <View style={styles.modalBody}>
+                <TextInput
+                  style={styles.modalTextInput}
+                  value={tempSmokingYears}
+                  onChangeText={setTempSmokingYears}
+                  keyboardType="numeric"
+                  placeholder="Nombre d'années"
+                  placeholderTextColor="#64748B"
+                  maxLength={2}
+                />
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.modalSaveButtonFull}
+                onPress={saveSmokingYears}
+              >
+                <Text style={styles.modalSaveButtonFullText}>Sauvegarder</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Modal pour modifier les cigarettes par jour */}
+        <Modal
+          visible={showCigsPerDayModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowCigsPerDayModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContentNew}>
+              <View style={styles.modalHeader}>
+                <TouchableOpacity 
+                  style={styles.modalBackButton}
+                  onPress={() => setShowCigsPerDayModal(false)}
+                >
+                  <Text style={styles.modalBackButtonText}>←</Text>
+                </TouchableOpacity>
+                <Text style={styles.modalTitleNew}>Modifier les cigarettes par jour</Text>
+                <View style={styles.modalHeaderSpacer} />
+              </View>
+              
+              <View style={styles.modalBody}>
+                <TextInput
+                  style={styles.modalTextInput}
+                  value={tempCigsPerDay}
+                  onChangeText={setTempCigsPerDay}
+                  keyboardType="numeric"
+                  placeholder="Nombre de cigarettes"
+                  placeholderTextColor="#64748B"
+                  maxLength={3}
+                />
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.modalSaveButtonFull}
+                onPress={saveCigsPerDay}
+              >
+                <Text style={styles.modalSaveButtonFullText}>Sauvegarder</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Modal pour modifier l'objectif */}
+        <Modal
+          visible={showObjectiveModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowObjectiveModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContentNew}>
+              <View style={styles.modalHeader}>
+                <TouchableOpacity 
+                  style={styles.modalBackButton}
+                  onPress={() => setShowObjectiveModal(false)}
+                >
+                  <Text style={styles.modalBackButtonText}>←</Text>
+                </TouchableOpacity>
+                <Text style={styles.modalTitleNew}>Modifier l'objectif</Text>
+                <View style={styles.modalHeaderSpacer} />
+              </View>
+              
+              <View style={styles.modalBody}>
+                <View style={styles.objectiveOptions}>
+                  <TouchableOpacity 
+                    style={[
+                      styles.objectiveOption,
+                      tempObjective === 'complete' && styles.objectiveOptionSelected
+                    ]}
+                    onPress={() => setTempObjective('complete')}
+                  >
+                    <Text style={[
+                      styles.objectiveOptionText,
+                      tempObjective === 'complete' && styles.objectiveOptionTextSelected
+                    ]}>Arrêt complet</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[
+                      styles.objectiveOption,
+                      tempObjective === 'progressive' && styles.objectiveOptionSelected
+                    ]}
+                    onPress={() => setTempObjective('progressive')}
+                  >
+                    <Text style={[
+                      styles.objectiveOptionText,
+                      tempObjective === 'progressive' && styles.objectiveOptionTextSelected
+                    ]}>Réduction progressive</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.modalSaveButtonFull}
+                onPress={saveObjective}
+              >
+                <Text style={styles.modalSaveButtonFullText}>Sauvegarder</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Modal pour modifier la langue */}
+        <Modal
+          visible={showLanguageModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowLanguageModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContentNew}>
+              <View style={styles.modalHeader}>
+                <TouchableOpacity 
+                  style={styles.modalBackButton}
+                  onPress={() => setShowLanguageModal(false)}
+                >
+                  <Text style={styles.modalBackButtonText}>←</Text>
+                </TouchableOpacity>
+                <Text style={styles.modalTitleNew}>Modifier la langue</Text>
+                <View style={styles.modalHeaderSpacer} />
+              </View>
+              
+              <View style={styles.modalBody}>
+                <View style={styles.languageOptions}>
+                  <TouchableOpacity 
+                    style={[
+                      styles.languageOption,
+                      tempLanguage === 'fr' && styles.languageOptionSelected
+                    ]}
+                    onPress={() => setTempLanguage('fr')}
+                  >
+                    <Text style={[
+                      styles.languageOptionText,
+                      tempLanguage === 'fr' && styles.languageOptionTextSelected
+                    ]}>🇫🇷 Français</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[
+                      styles.languageOption,
+                      tempLanguage === 'en' && styles.languageOptionSelected
+                    ]}
+                    onPress={() => setTempLanguage('en')}
+                  >
+                    <Text style={[
+                      styles.languageOptionText,
+                      tempLanguage === 'en' && styles.languageOptionTextSelected
+                    ]}>🇬🇧 English</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.modalSaveButtonFull}
+                onPress={saveLanguage}
+              >
+                <Text style={styles.modalSaveButtonFullText}>Sauvegarder</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Modal pour modifier la fréquence de réduction */}
+        <Modal
+          visible={showReductionFrequencyModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowReductionFrequencyModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContentNew}>
+              <View style={styles.modalHeader}>
+                <TouchableOpacity 
+                  style={styles.modalBackButton}
+                  onPress={() => setShowReductionFrequencyModal(false)}
+                >
+                  <Text style={styles.modalBackButtonText}>←</Text>
+                </TouchableOpacity>
+                <Text style={styles.modalTitleNew}>Modifier la fréquence de réduction</Text>
+                <View style={styles.modalHeaderSpacer} />
+              </View>
+              
+              <View style={styles.modalBody}>
+                <TextInput
+                  style={styles.modalTextInput}
+                  value={tempReductionFrequency}
+                  onChangeText={setTempReductionFrequency}
+                  keyboardType="numeric"
+                  placeholder="Cigarettes par jour"
+                  placeholderTextColor="#64748B"
+                  maxLength={2}
+                />
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.modalSaveButtonFull}
+                onPress={saveReductionFrequency}
+              >
+                <Text style={styles.modalSaveButtonFullText}>Sauvegarder</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Modal pour modifier la date d'arrêt */}
+        <Modal
+          visible={showTargetDateModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowTargetDateModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContentNew}>
+              <View style={styles.modalHeader}>
+                <TouchableOpacity 
+                  style={styles.modalBackButton}
+                  onPress={() => setShowTargetDateModal(false)}
+                >
+                  <Text style={styles.modalBackButtonText}>←</Text>
+                </TouchableOpacity>
+                <Text style={styles.modalTitleNew}>Modifier la date d'arrêt</Text>
+                <View style={styles.modalHeaderSpacer} />
+              </View>
+              
+              <View style={styles.modalBody}>
+                <TextInput
+                  style={styles.modalTextInput}
+                  value={tempTargetDate}
+                  onChangeText={setTempTargetDate}
+                  placeholder="YYYY-MM-DD (ex: 2024-12-31)"
+                  placeholderTextColor="#64748B"
+                />
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.modalSaveButtonFull}
+                onPress={saveTargetDate}
+              >
+                <Text style={styles.modalSaveButtonFullText}>Sauvegarder</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
@@ -1129,7 +1562,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#0a0a0a',
     borderRadius: 15,
     padding: 25,
     margin: 20,
@@ -1184,33 +1617,37 @@ const styles = StyleSheet.create({
   modalCancelButton: {
     backgroundColor: 'rgba(239, 68, 68, 0.2)',
     borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.4)',
     flex: 1,
     marginRight: 10,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
   },
   modalCancelButtonText: {
     color: '#EF4444',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   modalSaveButton: {
     backgroundColor: 'rgba(139, 69, 255, 0.8)',
     borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: 'rgba(139, 69, 255, 0.3)',
     flex: 1,
     marginLeft: 10,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
   },
   modalSaveButtonText: {
     color: '#F8FAFC',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   modalTextInput: {
@@ -1270,5 +1707,119 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 10,
     fontWeight: '500',
+  },
+  objectiveOptions: {
+    marginBottom: 25,
+  },
+  objectiveOption: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  objectiveOptionSelected: {
+    backgroundColor: 'rgba(139, 69, 255, 0.3)',
+    borderColor: 'rgba(139, 69, 255, 0.5)',
+  },
+  objectiveOptionText: {
+    color: '#F8FAFC',
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  objectiveOptionTextSelected: {
+    color: '#8B45FF',
+    fontWeight: 'bold',
+  },
+  languageOptions: {
+    marginBottom: 25,
+  },
+  languageOption: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  languageOptionSelected: {
+    backgroundColor: 'rgba(139, 69, 255, 0.3)',
+    borderColor: 'rgba(139, 69, 255, 0.5)',
+  },
+  languageOptionText: {
+    color: '#F8FAFC',
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  languageOptionTextSelected: {
+    color: '#8B45FF',
+    fontWeight: 'bold',
+  },
+  // Nouveaux styles pour les modals
+  modalContentNew: {
+    backgroundColor: '#0a0a0a',
+    borderRadius: 20,
+    margin: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    minWidth: 300,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  modalBackButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  modalBackButtonText: {
+    color: '#F8FAFC',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  modalTitleNew: {
+    color: '#F8FAFC',
+    fontSize: 18,
+    fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'center',
+  },
+  modalHeaderSpacer: {
+    width: 40,
+  },
+  modalBody: {
+    padding: 20,
+  },
+  modalSaveButtonFull: {
+    backgroundColor: 'rgba(34, 197, 94, 0.8)',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  modalSaveButtonFullText: {
+    color: '#F8FAFC',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

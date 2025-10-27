@@ -323,10 +323,7 @@ const BreathingExerciseWithSound: React.FC<BreathingExerciseWithSoundProps> = ({
 
 
   return (
-    <LinearGradient
-      colors={['#0F0F23', '#1A1A2E', '#16213E', '#0F3460']}
-      style={styles.container}
-    >
+    <View style={styles.container}>
       {/* Fond apaisant avec particules flottantes */}
       <View style={styles.backgroundContainer}>
         {Array.from({ length: 30 }).map((_, i) => (
@@ -359,7 +356,7 @@ const BreathingExerciseWithSound: React.FC<BreathingExerciseWithSoundProps> = ({
           <View style={styles.overlayContent}>
             <View style={styles.overlayHeader}>
               <TouchableOpacity style={styles.backButton} onPress={onClose}>
-                <Text style={styles.backButtonText}>← Retour</Text>
+                <Text style={styles.backButtonText}>←</Text>
               </TouchableOpacity>
               <Text style={styles.overlayTitle}>Exercices de Respiration</Text>
               <View style={styles.placeholder} />
@@ -400,10 +397,10 @@ const BreathingExerciseWithSound: React.FC<BreathingExerciseWithSoundProps> = ({
             
             {/* Bouton Confirmer */}
             <TouchableOpacity 
-              style={styles.confirmButton} 
+              style={styles.startButtonFull} 
               onPress={startExercise}
             >
-              <Text style={styles.confirmButtonText}>Commencer l'exercice</Text>
+              <Text style={styles.startButtonFullText}>Commencer l'exercice</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -484,13 +481,14 @@ const BreathingExerciseWithSound: React.FC<BreathingExerciseWithSoundProps> = ({
           </View>
         </View>
       )}
-    </LinearGradient>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0a0a0a',
   },
   backgroundContainer: {
     position: 'absolute',
@@ -548,7 +546,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   overlayContent: {
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
     borderRadius: 20,
     padding: 24,
     marginHorizontal: 20,
@@ -564,17 +562,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   backButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
   },
   backButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
+    color: '#F8FAFC',
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   overlayTitle: {
     color: '#FFFFFF',
@@ -855,7 +854,7 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   statsContent: {
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
     borderRadius: 20,
     padding: 32,
     marginHorizontal: 20,
@@ -902,6 +901,22 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '500',
+  },
+  startButtonFull: {
+    backgroundColor: 'rgba(34, 197, 94, 0.8)',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  startButtonFullText: {
+    color: '#F8FAFC',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

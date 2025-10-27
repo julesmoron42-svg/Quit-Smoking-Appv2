@@ -1128,13 +1128,10 @@ function GoalsScreen() {
 export default function AnalyticsTab({ route }: any) {
   const tabNavigatorRef = React.useRef<any>(null);
   const initialRoute = route?.params?.initialRoute || 'Cigarettes';
-  console.log('AnalyticsTab - initialRoute:', initialRoute);
-  console.log('AnalyticsTab - route params:', route?.params);
   
   // Naviguer vers l'onglet spécifié quand le composant est monté
   React.useEffect(() => {
     if (route?.params?.initialRoute && tabNavigatorRef.current) {
-      console.log('AnalyticsTab - Navigating to:', route.params.initialRoute);
       // Petit délai pour s'assurer que le navigateur est prêt
       setTimeout(() => {
         tabNavigatorRef.current?.navigate(route.params.initialRoute);

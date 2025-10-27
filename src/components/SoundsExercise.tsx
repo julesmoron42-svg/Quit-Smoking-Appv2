@@ -16,19 +16,17 @@ import { useSubscription } from '../contexts/SubscriptionContextMock';
 
 const { width, height } = Dimensions.get('window');
 
-interface SoundsLibraryProps {
+interface SoundsExerciseProps {
   onClose: () => void;
   onStatsUpdate?: (stats: { panicCount: number; successCount: number }) => void;
 }
 
-
-const SoundsLibrary: React.FC<SoundsLibraryProps> = ({ onClose, onStatsUpdate }) => {
+const SoundsExercise: React.FC<SoundsExerciseProps> = ({ onClose, onStatsUpdate }) => {
   const { isPremium } = useSubscription();
   const [selectedSound, setSelectedSound] = useState<SoundTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [volume, setVolume] = useState(0.7);
   const [hasPlayedSound, setHasPlayedSound] = useState(false);
   const [isActive, setIsActive] = useState(false);
@@ -42,18 +40,12 @@ const SoundsLibrary: React.FC<SoundsLibraryProps> = ({ onClose, onStatsUpdate })
         [
           { text: 'Annuler', style: 'cancel', onPress: onClose },
           { text: 'S\'abonner', onPress: () => {
-            // Ici on pourrait rediriger vers l'onglet Premium
             onClose();
           }}
         ]
       );
     }
   }, [isPremium, onClose]);
-
-  // Filtrer les sons par catégorie
-  const filteredSounds = selectedCategory === 'all' 
-    ? soundsLibrary 
-    : soundsLibrary.filter(sound => sound.category === selectedCategory);
 
   // Charger un son
   const loadSound = async (soundTrack: SoundTrack) => {
@@ -83,9 +75,15 @@ const SoundsLibrary: React.FC<SoundsLibraryProps> = ({ onClose, onStatsUpdate })
       setCurrentTime(0);
       setIsPlaying(false);
 
+      console.log('🎵 Tentative de chargement:', {
+        title: soundTrack.title,
+        filename: soundTrack.filename,
+        audioPath: soundTrack.audioPath
+      });
+
       // Charger le nouveau son depuis les assets locaux
       const { sound: newSound } = await Audio.Sound.createAsync(
-        soundTrack.audioPath, // Utilise le chemin configuré dans soundsConfig.ts
+        soundTrack.audioPath,
         { 
           shouldPlay: false,
           volume: volume,
@@ -98,10 +96,9 @@ const SoundsLibrary: React.FC<SoundsLibraryProps> = ({ onClose, onStatsUpdate })
       setSound(newSound);
       console.log(`🎵 Son chargé: ${soundTrack.title}`);
       
-      // Jouer automatiquement le son quand il est chargé
-      await newSound.playAsync();
-      setIsPlaying(true);
-      setHasPlayedSound(true);
+      // Ne pas jouer automatiquement, attendre que l'utilisateur clique sur play
+      setIsPlaying(false);
+      setHasPlayedSound(false);
       
       // Écouter la fin du son
       newSound.setOnPlaybackStatusUpdate((status) => {
@@ -110,7 +107,7 @@ const SoundsLibrary: React.FC<SoundsLibraryProps> = ({ onClose, onStatsUpdate })
           if (status.didJustFinish) {
             setIsPlaying(false);
             setCurrentTime(0);
-            // Demander si l'envie a été arrêtée quand le son se termine
+            // Demander si l'envie a été arrêtée quand le son se termine automatiquement
             setTimeout(() => {
               showSuccessQuestion();
             }, 1000);
@@ -120,7 +117,11 @@ const SoundsLibrary: React.FC<SoundsLibraryProps> = ({ onClose, onStatsUpdate })
       
     } catch (error) {
       console.error('Erreur lors du chargement du son:', error);
-      Alert.alert('Erreur', 'Impossible de charger le son. Vérifiez que le fichier existe.');
+      console.error('Son problématique:', soundTrack.title, soundTrack.filename);
+      Alert.alert(
+        'Erreur de chargement', 
+        `Impossible de charger "${soundTrack.title}". Vérifiez que le fichier ${soundTrack.filename} existe et n'est pas corrompu.`
+      );
     }
   };
 
@@ -163,7 +164,7 @@ const SoundsLibrary: React.FC<SoundsLibraryProps> = ({ onClose, onStatsUpdate })
             if (status.didJustFinish) {
               setIsPlaying(false);
               setCurrentTime(0);
-              // Demander si l'envie a été arrêtée quand le son se termine
+              // Demander si l'envie a été arrêtée quand le son se termine automatiquement
               setTimeout(() => {
                 showSuccessQuestion();
               }, 1000);
@@ -236,8 +237,14 @@ const SoundsLibrary: React.FC<SoundsLibraryProps> = ({ onClose, onStatsUpdate })
           text: 'Oui, autre son',
           style: 'default',
           onPress: () => {
-            // Laisser l'utilisateur choisir un autre son
+            // Arrêter le son actuel et remettre l'utilisateur à l'écran de sélection
             console.log('Utilisateur veut essayer un autre son');
+            stopSound();
+            setSelectedSound(null);
+            setIsActive(false);
+            setCurrentTime(0);
+            setIsPlaying(false);
+            setHasPlayedSound(false);
           }
         }
       ]
@@ -270,26 +277,14 @@ const SoundsLibrary: React.FC<SoundsLibraryProps> = ({ onClose, onStatsUpdate })
 
   // Fonction pour gérer la fermeture avec suivi
   const handleClose = () => {
-    if (hasPlayedSound) {
-      Alert.alert(
-        '🎵 Session interrompue',
-        'Tu quittes la session de sons. L\'envie de fumer a-t-elle disparu ?',
-        [
-          {
-            text: '❌ Non, toujours envie',
-            style: 'destructive',
-            onPress: () => updatePanicStats(false)
-          },
-          {
-            text: '✅ Oui, envie arrêtée !',
-            style: 'default',
-            onPress: () => updatePanicStats(true)
-          }
-        ]
-      );
-    } else {
-      onClose();
+    // Arrêter le son automatiquement
+    if (sound) {
+      stopSound();
     }
+    
+    // Ne pas afficher de popup quand on ferme l'interface générale
+    // Le popup n'apparaîtra que quand on quitte un son spécifique ou qu'il se termine
+    onClose();
   };
 
   // Formater le temps
@@ -328,7 +323,7 @@ const SoundsLibrary: React.FC<SoundsLibraryProps> = ({ onClose, onStatsUpdate })
       <View style={styles.header}>
         <View style={styles.titleContainer}>
           <Text style={styles.exerciseTitle}>🎵 Sons Apaisants</Text>
-          <Text style={styles.exerciseDescription}>Utilise ton rythme cardiaque pour réguler quand les envies montent</Text>
+          <Text style={styles.exerciseDescription}>Utilise des sons relaxants pour calmer tes envies</Text>
         </View>
       </View>
 
@@ -346,38 +341,53 @@ const SoundsLibrary: React.FC<SoundsLibraryProps> = ({ onClose, onStatsUpdate })
             <Text style={styles.overlaySubtitle}>Choisissez selon votre besoin</Text>
             
             <ScrollView style={styles.soundsList} showsVerticalScrollIndicator={false}>
-              {filteredSounds.map((soundTrack) => (
-                <TouchableOpacity
-                  key={soundTrack.id}
-                  style={[
-                    styles.soundRow,
-                    selectedSound?.id === soundTrack.id && styles.soundRowSelected
-                  ]}
-                  onPress={() => loadSound(soundTrack)}
-                >
-                  <View style={styles.soundRowLeft}>
-                    <Text style={styles.soundRowEmoji}>{soundTrack.emoji}</Text>
-                    <View style={styles.soundRowText}>
-                      <Text style={styles.soundRowName}>{soundTrack.title}</Text>
-                      <Text style={styles.soundRowDesc}>{soundTrack.description}</Text>
-                    </View>
+              {/* Affichage par catégories */}
+              {Object.entries(categoryInfo).map(([categoryKey, categoryInfo]) => {
+                const categorySounds = soundsLibrary.filter(sound => sound.category === categoryKey);
+                if (categorySounds.length === 0) return null;
+
+                return (
+                  <View key={categoryKey} style={styles.categorySection}>
+                    <Text style={styles.categoryTitle}>
+                      {categoryInfo.emoji} {categoryInfo.name}
+                    </Text>
+                    
+                    {categorySounds.map((soundTrack) => (
+                      <TouchableOpacity
+                        key={soundTrack.id}
+                        style={[
+                          styles.soundRow,
+                          selectedSound?.id === soundTrack.id && styles.soundRowSelected
+                        ]}
+                        onPress={() => setSelectedSound(soundTrack)}
+                      >
+                        <View style={styles.soundRowLeft}>
+                          <Text style={styles.soundRowEmoji}>{soundTrack.emoji}</Text>
+                          <View style={styles.soundRowText}>
+                            <Text style={styles.soundRowName}>{soundTrack.title}</Text>
+                            <Text style={styles.soundRowDesc}>{soundTrack.description}</Text>
+                          </View>
+                        </View>
+                        <View style={styles.soundRowRight}>
+                          <Text style={styles.soundRowTime}>{soundTrack.duration}min</Text>
+                          {selectedSound?.id === soundTrack.id && (
+                            <Text style={styles.soundRowCheck}>✓</Text>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    ))}
                   </View>
-                  <View style={styles.soundRowRight}>
-                    <Text style={styles.soundRowTime}>{soundTrack.duration}min</Text>
-                    {selectedSound?.id === soundTrack.id && (
-                      <Text style={styles.soundRowCheck}>✓</Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ))}
+                );
+              })}
             </ScrollView>
             
             {/* Bouton Confirmer */}
             <TouchableOpacity 
-              style={styles.startButtonFull} 
+              style={[styles.startButtonFull, !selectedSound && styles.startButtonDisabled]} 
               onPress={() => {
                 if (selectedSound) {
                   loadSound(selectedSound);
+                  setIsActive(true);
                 }
               }}
             >
@@ -387,80 +397,105 @@ const SoundsLibrary: React.FC<SoundsLibraryProps> = ({ onClose, onStatsUpdate })
         </View>
       )}
 
-      {/* Contrôles de lecture */}
-      {selectedSound && (
-        <View style={styles.playerControls}>
-          <View style={styles.playerInfo}>
-            <Text style={styles.playerTitle}>{selectedSound.emoji} {selectedSound.title}</Text>
-            <Text style={styles.playerTime}>
-              {formatTime(currentTime)} / {formatTime(selectedSound.duration * 60)}
+      {/* Interface de lecture */}
+      {isActive && selectedSound && (
+        <View style={styles.playerOverlay}>
+          <View style={styles.playerContent}>
+            <View style={styles.playerHeader}>
+              <TouchableOpacity 
+                style={styles.backButton} 
+                onPress={() => {
+                  // Afficher le popup quand on quitte un son spécifique
+                  if (hasPlayedSound) {
+                    Alert.alert(
+                      '🎵 Son interrompu',
+                      'Tu quittes ce son. L\'envie de fumer a-t-elle disparu ?',
+                      [
+                        {
+                          text: '❌ Non, toujours envie',
+                          style: 'destructive',
+                          onPress: () => showAnotherSoundQuestion()
+                        },
+                        {
+                          text: '✅ Oui, envie arrêtée !',
+                          style: 'default',
+                          onPress: () => {
+                            updatePanicStats(true);
+                            stopSound();
+                            setSelectedSound(null);
+                            setIsActive(false);
+                          }
+                        }
+                      ]
+                    );
+                  } else {
+                    // Si aucun son n'a été joué, retourner directement
+                    stopSound();
+                    setSelectedSound(null);
+                    setIsActive(false);
+                  }
+                }}
+              >
+                <Text style={styles.backButtonText}>←</Text>
+              </TouchableOpacity>
+              <Text style={styles.playerTitle}>🎵 {selectedSound.title}</Text>
+              <View style={styles.placeholder} />
+            </View>
+            
+            <View style={styles.playerInfo}>
+              <Text style={styles.playerDescription}>{selectedSound.description}</Text>
+              <Text style={styles.playerTime}>
+                {formatTime(currentTime)} / {formatTime(selectedSound.duration * 60)}
+              </Text>
+            </View>
+            
+            {/* Barre de progression */}
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
+            </View>
+            
+            {/* Boutons de contrôle */}
+            <View style={styles.controlsRow}>
+              <TouchableOpacity style={styles.controlButton} onPress={stopSound}>
+                <Text style={styles.controlButtonText}>⏹️</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={[styles.controlButton, styles.playButtonMain]} onPress={togglePlayPause}>
+                <Text style={styles.controlButtonText}>{isPlaying ? '⏸️' : '▶️'}</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.controlButton}
+                onPress={() => {
+                  const newVolume = volume > 0.1 ? volume - 0.1 : 0;
+                  setVolume(newVolume);
+                  if (sound) {
+                    sound.setVolumeAsync(newVolume);
+                  }
+                }}
+              >
+                <Text style={styles.controlButtonText}>🔉</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.controlButton}
+                onPress={() => {
+                  const newVolume = volume < 1 ? volume + 0.1 : 1;
+                  setVolume(newVolume);
+                  if (sound) {
+                    sound.setVolumeAsync(newVolume);
+                  }
+                }}
+              >
+                <Text style={styles.controlButtonText}>🔊</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Commentaire sur le mode silencieux */}
+            <Text style={styles.silentModeTip}>
+              💡 Assurez-vous que votre téléphone n'est pas en mode silencieux
             </Text>
           </View>
-          
-          {/* Barre de progression */}
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
-          </View>
-          
-          {/* Contrôle de volume */}
-          <View style={styles.volumeContainer}>
-            <Text style={styles.volumeLabel}>🔊 Volume</Text>
-            <View style={styles.volumeSlider}>
-              <View style={[styles.volumeFill, { width: `${volume * 100}%` }]} />
-            </View>
-            <Text style={styles.volumeValue}>{Math.round(volume * 100)}%</Text>
-          </View>
-          
-          {/* Boutons de contrôle */}
-          <View style={styles.controlsRow}>
-            <TouchableOpacity style={styles.controlButton} onPress={stopSound}>
-              <Text style={styles.controlButtonText}>⏹️</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={[styles.controlButton, styles.playButtonMain]} onPress={togglePlayPause}>
-              <Text style={styles.controlButtonText}>{isPlaying ? '⏸️' : '▶️'}</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.controlButton}
-              onPress={() => {
-                const newVolume = volume > 0.1 ? volume - 0.1 : 0;
-                setVolume(newVolume);
-                if (sound) {
-                  sound.setVolumeAsync(newVolume);
-                }
-              }}
-            >
-              <Text style={styles.controlButtonText}>🔉</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.controlButton}
-              onPress={() => {
-                const newVolume = volume < 1 ? volume + 0.1 : 1;
-                setVolume(newVolume);
-                if (sound) {
-                  sound.setVolumeAsync(newVolume);
-                }
-              }}
-            >
-              <Text style={styles.controlButtonText}>🔊</Text>
-            </TouchableOpacity>
-          </View>
-          
-          {/* Bouton de démarrage de l'exercice */}
-          {selectedSound && hasPlayedSound && (
-            <TouchableOpacity 
-              style={styles.startExerciseButton}
-              onPress={() => {
-                // Logique pour démarrer l'exercice avec le son
-                console.log('🎵 Démarrage de l\'exercice avec:', selectedSound.title);
-                onClose();
-              }}
-            >
-              <Text style={styles.startExerciseButtonText}>Commencer l'exercice</Text>
-            </TouchableOpacity>
-          )}
         </View>
       )}
     </View>
@@ -490,17 +525,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 3,
-  },
-  gradient: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
   },
   header: {
     alignItems: 'center',
@@ -587,6 +611,16 @@ const styles = StyleSheet.create({
   },
   soundsList: {
     maxHeight: 400,
+  },
+  categorySection: {
+    marginBottom: 20,
+  },
+  categoryTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    paddingLeft: 4,
   },
   soundRow: {
     flexDirection: 'row',
@@ -694,114 +728,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
   },
-  volumeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 20,
-  },
-  volumeLabel: {
-    color: '#94A3B8',
-    fontSize: 14,
-    marginRight: 10,
-    minWidth: 80,
-  },
-  volumeSlider: {
-    flex: 1,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 2,
-    marginRight: 10,
-  },
-  volumeFill: {
-    height: '100%',
-    backgroundColor: '#8B5CF6',
-    borderRadius: 2,
-  },
-  volumeValue: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    minWidth: 35,
-    textAlign: 'right',
-  },
-  premiumOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  premiumContent: {
-    backgroundColor: 'rgba(0, 0, 0, 0.95)',
-    borderRadius: 20,
-    padding: 32,
-    marginHorizontal: 20,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    maxWidth: 300,
-  },
-  premiumTitle: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  premiumDescription: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 22,
-  },
-  premiumButton: {
-    backgroundColor: '#8B45FF',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 69, 255, 0.4)',
-  },
-  premiumButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  backButtonText: {
-    color: '#F8FAFC',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  startExerciseButton: {
-    backgroundColor: 'rgba(34, 197, 94, 0.8)',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(34, 197, 94, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 20,
-  },
-  startExerciseButtonText: {
-    color: '#F8FAFC',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   startButtonFull: {
     backgroundColor: 'rgba(34, 197, 94, 0.8)',
     borderRadius: 12,
@@ -818,6 +744,57 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  startButtonDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  playerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  playerContent: {
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    borderRadius: 20,
+    padding: 24,
+    marginHorizontal: 20,
+    width: '90%',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  playerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  playerTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '500',
+    textAlign: 'center',
+    letterSpacing: 0.3,
+    flex: 1,
+  },
+  playerDescription: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  silentModeTip: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 16,
+    fontStyle: 'italic',
+  },
 });
 
-export default SoundsLibrary;
+export default SoundsExercise;

@@ -10,7 +10,7 @@ interface SubscriptionProviderProps {
 
 // Version mock 100% compatible Expo Go - aucun module natif
 export const SubscriptionProviderMock: React.FC<SubscriptionProviderProps> = ({ children }) => {
-  const [isPremium, setIsPremium] = useState(false);
+  const [isPremium, setIsPremium] = useState(true); // Activé pour tester le coach IA
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 

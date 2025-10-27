@@ -182,7 +182,7 @@ export const profileStorage = {
           const { DataSyncService } = await import('./dataSync');
           const { data: remoteProfile } = await DataSyncService.getUserProfile(userId);
           if (remoteProfile) {
-            console.log('📥 Profil chargé depuis Supabase:', remoteProfile);
+            // console.log('📥 Profil chargé depuis Supabase:', remoteProfile);
             // Sauvegarder localement pour éviter de recharger à chaque fois
             await storage.set(STORAGE_KEYS.PROFILE, remoteProfile);
             return remoteProfile;
@@ -210,7 +210,7 @@ export const profileStorage = {
         if (result.error) {
           console.error('❌ Erreur sauvegarde profil:', result.error);
         } else {
-          console.log('✅ Profil sauvegardé dans Supabase');
+          // console.log('✅ Profil sauvegardé dans Supabase');
         }
       } catch (error) {
         console.error('❌ Erreur lors de la sauvegarde profil:', error);
@@ -233,7 +233,7 @@ export const settingsStorage = {
           const { DataSyncService } = await import('./dataSync');
           const { data: remoteSettings } = await DataSyncService.getSettings(userId);
           if (remoteSettings) {
-            console.log('📥 Paramètres chargés depuis Supabase:', remoteSettings);
+            // console.log('📥 Paramètres chargés depuis Supabase:', remoteSettings);
             // Sauvegarder localement pour éviter de recharger à chaque fois
             await storage.set(STORAGE_KEYS.SETTINGS, remoteSettings);
             return remoteSettings;
@@ -260,7 +260,7 @@ export const settingsStorage = {
         if (result.error) {
           console.error('❌ Erreur sauvegarde paramètres:', result.error);
         } else {
-          console.log('✅ Paramètres sauvegardés dans Supabase');
+          // console.log('✅ Paramètres sauvegardés dans Supabase');
         }
       } catch (error) {
         console.error('❌ Erreur lors de la sauvegarde paramètres:', error);

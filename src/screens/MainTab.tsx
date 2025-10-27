@@ -36,6 +36,7 @@ import { TimerSession, DailyEntry, StreakData, UserProfile, AppSettings } from '
 import DailyEntryModal from '../components/DailyEntryModal';
 import NewOnboardingFlow from '../components/NewOnboardingFlow';
 import { OnboardingQuestionnaireData } from '../types';
+import AICoachScreen from './AICoachScreen';
 
 const { width } = Dimensions.get('window');
 
@@ -134,6 +135,7 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
   const [selectedDate, setSelectedDate] = useState('');
   const [onboardingVisible, setOnboardingVisible] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showAICoach, setShowAICoach] = useState(false);
   useEffect(() => {
     loadData();
   }, []);
@@ -153,19 +155,36 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
     );
   };
 
-  const handleAITherapistButton = () => {
+  const handleAITherapistButton = async () => {
     // Vibration de sélection pour le coach IA
-    HapticService.selection();
+    await HapticService.selection();
     
-    // TODO: Vérifier si l'utilisateur a le bundle Coach IA
+    // Temporairement désactivé en attendant la configuration de l'API
     Alert.alert(
       '🤖 Coach IA',
-      'Cette fonctionnalité sera disponible avec le pack Coach IA Premium.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Voir les offres', onPress: () => navigation.navigate('Premium') }
-      ]
+      'Le coach IA arrive bientôt ! Cette fonctionnalité sera disponible très prochainement.',
+      [{ text: 'OK' }]
     );
+    return;
+    
+    // Code original (commenté temporairement)
+    /*
+    // Vérifier si l'utilisateur est premium
+    if (!isPremium) {
+      Alert.alert(
+        '🤖 Coach IA',
+        'Cette fonctionnalité est disponible avec l\'abonnement Premium. Voulez-vous vous abonner ?',
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Voir les offres', onPress: () => navigation.navigate('Premium') }
+        ]
+      );
+      return;
+    }
+    
+    // Ouvrir le coach IA
+    setShowAICoach(true);
+    */
   };
 
   // Vérifier si l'onboarding est nécessaire
@@ -187,7 +206,6 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
   // Gérer l'ouverture de l'overlay depuis une notification
   useEffect(() => {
     if (shouldOpenDailyEntry) {
-      console.log('🔔 Ouverture de l\'overlay de saisie quotidienne depuis la notification');
       const today = new Date().toISOString().split('T')[0];
       setSelectedDate(today);
       setModalVisible(true);
@@ -418,15 +436,6 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
       const cigarettesAvoided = calculateCigarettesAvoided(profile, newEntries, elapsed);
       const moneySaved = calculateMoneySaved(cigarettesAvoided, settings.pricePerCig);
       
-      console.log('Nouvelles statistiques après entrée:', {
-        date: entry.date,
-        realCigs: entry.realCigs,
-        goalCigs: entry.goalCigs,
-        objectiveMet: entry.objectiveMet,
-        cigarettesAvoided,
-        moneySaved,
-        streak: newStreakData.currentStreak
-      });
       
       // Afficher un résumé des statistiques
       const dailyAvoided = Math.max(0, profile.cigsPerDay - entry.realCigs);
@@ -866,8 +875,6 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
                     <TouchableOpacity 
                       style={styles.healthGoalCard}
                       onPress={() => {
-                        // Navigation vers l'onglet Analytics avec paramètre pour aller à Santé
-                        console.log('MainTab - Navigating to Analytics with initialRoute: Santé');
                         navigation.navigate('Analytics', { initialRoute: 'Santé' });
                       }}
                     >
@@ -891,8 +898,6 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
                   <TouchableOpacity 
                     style={styles.healthGoalCard}
                     onPress={() => {
-                      // Navigation vers l'onglet Analytics avec paramètre pour aller à Santé
-                      console.log('MainTab - Navigating to Analytics with initialRoute: Santé');
                       navigation.navigate('Analytics', { initialRoute: 'Santé' });
                     }}
                   >
@@ -913,8 +918,6 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
                 <TouchableOpacity 
                   style={[styles.healthGoalCard, styles.healthGoalCardAccomplished]}
                   onPress={() => {
-                    // Navigation vers l'onglet Analytics avec paramètre pour aller à Santé
-                    console.log('MainTab - Navigating to Analytics with initialRoute: Santé');
                     navigation.navigate('Analytics', { initialRoute: 'Santé' });
                   }}
                 >
@@ -948,6 +951,11 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
         goalCigs={profile.objectiveType === 'complete' ? 0 : getProgressiveGoal(profile, Object.keys(dailyEntries).length)}
         initialEntry={selectedDate ? dailyEntries[selectedDate] : undefined}
       />
+
+      {/* Coach IA */}
+      {showAICoach && (
+        <AICoachScreen onClose={() => setShowAICoach(false)} />
+      )}
 
       {/* Nouveau système d'onboarding */}
       <NewOnboardingFlow

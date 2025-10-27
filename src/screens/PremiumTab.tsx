@@ -18,7 +18,7 @@ import PremiumFeatureCard from '../components/PremiumFeatureCard';
 import BreathingExerciseWithSound from '../components/BreathingExerciseWithSound';
 import MeditationExerciseWithSound from '../components/MeditationExerciseWithSound';
 import MeditationAntiSmokingExercises from '../components/MeditationAntiSmokingExercises';
-import SoundsOverlay from '../components/SoundsOverlay';
+import SoundsExercise from '../components/SoundsExercise';
 import { panicStatsStorage } from '../lib/storage';
 import { PanicStats } from '../types';
 
@@ -29,12 +29,8 @@ export default function PremiumTab() {
   const [selectedPlan, setSelectedPlan] = useState(SUBSCRIPTION_PLANS[2]); // Pack Complet par défaut
   const [showBreathingExercise, setShowBreathingExercise] = useState(false);
   const [showMeditationExercise, setShowMeditationExercise] = useState(false);
-  const [showSoundsLibrary, setShowSoundsLibrary] = useState(false);
+  const [showSoundsExercise, setShowSoundsExercise] = useState(false);
   
-  // Log pour déboguer l'état
-  useEffect(() => {
-    console.log('🔍 État showSoundsLibrary:', showSoundsLibrary);
-  }, [showSoundsLibrary]);
   
   // Statistiques de panique (synchronisées avec Supabase)
   const [panicStats, setPanicStats] = useState<PanicStats>({
@@ -48,9 +44,8 @@ export default function PremiumTab() {
       try {
         const stats = await panicStatsStorage.get();
         setPanicStats(stats);
-        console.log('📊 Stats panique chargées:', stats);
       } catch (error) {
-        console.log('Erreur lors du chargement des stats:', error);
+        console.error('❌ PremiumTab - Load Stats Error:', error);
       }
     };
     loadStats();
@@ -58,29 +53,25 @@ export default function PremiumTab() {
 
   // Recharger les stats quand on revient sur l'écran (quand les modales se ferment)
   useEffect(() => {
-    if (!showBreathingExercise && !showMeditationExercise && !showSoundsLibrary) {
+    if (!showBreathingExercise && !showMeditationExercise && !showSoundsExercise) {
       const reloadStats = async () => {
         try {
           const stats = await panicStatsStorage.get();
           setPanicStats(stats);
-          console.log('🔄 Stats panique rechargées:', stats);
         } catch (error) {
-          console.log('Erreur lors du rechargement des stats:', error);
+          console.error('❌ PremiumTab - Reload Stats Error:', error);
         }
       };
       reloadStats();
     }
-  }, [showBreathingExercise, showMeditationExercise, showSoundsLibrary]);
+  }, [showBreathingExercise, showMeditationExercise, showSoundsExercise]);
 
 
   const handlePurchase = async () => {
     try {
       const success = await purchaseSubscription(selectedPlan.productId);
-      if (success) {
-        console.log('Achat initié avec succès');
-      }
     } catch (error) {
-      console.error('Erreur lors de l\'achat:', error);
+      console.error('❌ PremiumTab - Purchase Error:', error);
     }
   };
 
@@ -90,32 +81,24 @@ export default function PremiumTab() {
 
 
   const handleFeaturePress = (feature: any) => {
-    console.log('🔍 handleFeaturePress appelé:', {
-      featureId: feature.id,
-      featureTitle: feature.title,
-      isPremium: isPremium,
-      featureIsAvailable: feature.isAvailable
-    });
-    
-    console.log('🔍 État complet:', {
-      isPremium,
-      showSoundsLibrary,
-      feature
-    });
-    
     if (isPremium) {
       // Vérifier si c'est une fonctionnalité d'exercice disponible
       if (feature.id === 'breathing_exercises') {
-        console.log('🫁 Ouverture exercices de respiration');
         setShowBreathingExercise(true);
       } else if (feature.id === 'meditation_library') {
-        console.log('🧘 Ouverture bibliothèque méditations');
         setShowMeditationExercise(true);
-      } else if (feature.id === 'relaxation_sounds' || feature.id === 'sounds_library') {
-        console.log('🎵 Ouverture sons de relaxation');
-        setShowSoundsLibrary(true);
+      } else if (feature.id === 'relaxation_sounds') {
+        setShowSoundsExercise(true);
+      } else if (feature.id === 'ai_coach') {
+        // Ouvrir le coach IA
+        Alert.alert(
+          '🤖 Coach IA',
+          'Le coach IA est maintenant disponible ! Vous pouvez y accéder depuis l\'écran principal.',
+          [
+            { text: 'OK' }
+          ]
+        );
       } else {
-        console.log('❓ Fonctionnalité non reconnue:', feature.id);
         // Pour les autres fonctionnalités, vérifier si elles sont disponibles
         if (feature.isAvailable) {
           Alert.alert(
@@ -132,7 +115,6 @@ export default function PremiumTab() {
         }
       }
     } else {
-      console.log('💳 Utilisateur non premium');
       Alert.alert(
         'Fonctionnalité Premium',
         `Cette fonctionnalité est disponible avec l'abonnement Premium. Voulez-vous vous abonner ?`,
@@ -154,7 +136,7 @@ export default function PremiumTab() {
     try {
       await panicStatsStorage.set(newStats);
     } catch (error) {
-      console.log('Erreur lors de la sauvegarde des stats:', error);
+      console.error('❌ PremiumTab - Save Stats Error:', error);
     }
   };
 
@@ -286,17 +268,15 @@ export default function PremiumTab() {
         </View>
       )}
 
-      {showSoundsLibrary && (
+      {showSoundsExercise && (
         <View style={styles.modalContainer}>
-          <SoundsOverlay 
-            onClose={() => {
-              console.log('🎵 FERMETURE OVERLAY SONS');
-              setShowSoundsLibrary(false);
-            }} 
+          <SoundsExercise 
+            onClose={() => setShowSoundsExercise(false)} 
             onStatsUpdate={updatePanicStats}
           />
         </View>
       )}
+
     </StarryBackground>
   );
 }

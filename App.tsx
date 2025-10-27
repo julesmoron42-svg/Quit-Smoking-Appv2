@@ -9,6 +9,7 @@ import * as Notifications from 'expo-notifications';
 // Import des contextes et écrans
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { SubscriptionProviderMock as SubscriptionProvider } from './src/contexts/SubscriptionContextMock';
+import { AICoachProvider } from './src/contexts/AICoachContext';
 import { AuthScreen } from './src/screens/AuthScreen';
 import MainTab from './src/screens/MainTab';
 import AnalyticsTab from './src/screens/AnalyticsTab';
@@ -198,7 +199,9 @@ export default function App() {
   return (
     <AuthProvider>
       <SubscriptionProvider>
-        <MainApp />
+        <AICoachProvider>
+          <MainApp />
+        </AICoachProvider>
       </SubscriptionProvider>
     </AuthProvider>
   );

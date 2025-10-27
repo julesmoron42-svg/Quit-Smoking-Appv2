@@ -151,7 +151,7 @@ export class DataSyncService {
         animationsEnabled: data.animations_enabled,
       } : null;
       
-      console.log('Paramètres récupérés:', { data, settings, error });
+      // console.log('Paramètres récupérés:', { data, settings, error });
       return { data: settings, error: null };
     } catch (error) {
       console.error('Erreur lors de la récupération des paramètres:', error);
@@ -461,7 +461,7 @@ export class DataSyncService {
         currentStreak: data.current_streak,
       } : null;
       
-      console.log('Série récupérée:', { data, streak, error });
+      // console.log('Série récupérée:', { data, streak, error });
       return { data: streak, error: null };
     } catch (error) {
       console.error('Erreur lors de la récupération de la série:', error);
