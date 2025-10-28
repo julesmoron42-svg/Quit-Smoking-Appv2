@@ -7,7 +7,6 @@ import {
   Dimensions,
   ScrollView,
   Animated,
-  TouchableOpacity,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import StarryBackground from '../components/StarryBackground';
@@ -161,29 +160,18 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
   }, [handleSaveEntry, profile, settings, cigarettesAvoided, moneySaved]);
 
   const handleRestart = useCallback(async () => {
+    const newSession = {
+      isRunning: false,
+      startTimestamp: null,
+      elapsedBeforePause: 0,
+    };
+    
+    await sessionStorage.set(newSession);
+    
     Alert.alert(
-      'Redémarrer',
-      'Êtes-vous sûr de vouloir redémarrer le chronomètre ? Tous vos progrès santé seront remis à zéro.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Redémarrer',
-          style: 'destructive',
-          onPress: async () => {
-            const newSession = {
-              isRunning: false,
-              startTimestamp: null,
-              elapsedBeforePause: 0,
-            };
-            
-            Alert.alert(
-              'Chronomètre redémarré',
-              'Votre chronomètre a été remis à zéro. Tous vos bénéfices santé ont été réinitialisés.',
-              [{ text: 'OK' }]
-            );
-          },
-        },
-      ]
+      'Chronomètre redémarré',
+      'Votre chronomètre a été remis à zéro. Tous vos bénéfices santé ont été réinitialisés.',
+      [{ text: 'OK' }]
     );
   }, []);
 
@@ -330,12 +318,73 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.content}>
           
-          {/* Composants refactorisés */}
-          <DailyProgress 
-            dailyEntries={dailyEntries}
-            profile={profile}
-            onDayPress={handleDailyEntry}
-          />
+          {/* Frise des 7 jours */}
+          <View style={styles.sevenDaysContainer}>
+            <View style={styles.daysLabels}>
+              {getSevenDaysData().map((day, index) => (
+                <View key={index} style={styles.dayLabelContainer}>
+                  <Text style={styles.dayLabel}>{day.dayName}</Text>
+                  <Text style={styles.dayDate}>{day.dayNumber}/{new Date(day.date).getMonth() + 1}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={styles.daysIndicators}>
+              {getSevenDaysData().map((day, index) => {
+                const hasEntry = day.entry !== undefined;
+                const objectiveMet = day.entry?.objectiveMet || false;
+                const realCigs = day.entry?.realCigs || 0;
+                const goalCigs = day.goalCigs;
+                const progress = goalCigs > 0 ? Math.min(realCigs / goalCigs, 1) : 0;
+                const isOverGoal = realCigs > goalCigs;
+                
+                return (
+                  <View key={index} style={styles.dayContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.dayIndicator,
+                        hasEntry && {
+                          backgroundColor: objectiveMet ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+                          borderColor: objectiveMet ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)',
+                        }
+                      ]}
+                      onPress={() => handleDailyEntry(index)}
+                    >
+                      {hasEntry ? (
+                        <Text style={[
+                          styles.dayIndicatorIcon,
+                          { color: objectiveMet ? '#10B981' : '#EF4444' }
+                        ]}>
+                          {objectiveMet ? '✓' : '✗'}
+                        </Text>
+                      ) : (
+                        <View style={styles.dayIndicatorInner} />
+                      )}
+                    </TouchableOpacity>
+                    
+                    {/* Barre de progression sous chaque jour */}
+                    {hasEntry && (
+                      <View style={styles.dayProgressContainer}>
+                        <View style={styles.dayProgressBar}>
+                          <View 
+                            style={[
+                              styles.dayProgressFill, 
+                              { 
+                                width: `${Math.min(progress * 100, 100)}%`,
+                                backgroundColor: isOverGoal ? '#EF4444' : '#10B981'
+                              }
+                            ]} 
+                          />
+                        </View>
+                        <Text style={styles.dayProgressText}>
+                          {realCigs}/{goalCigs}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
 
           {/* Orb central */}
           <View style={styles.orbContainer}>
@@ -358,32 +407,146 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
             </Animated.View>
           </View>
 
-          {/* Timer refactorisé */}
-          <TimerDisplay 
-            elapsed={elapsed}
-            session={session}
-            isSyncing={isSyncing}
-          />
+          {/* Timer */}
+          <View style={styles.timerContainer}>
+            <Text style={styles.timerLabel}>Vous avez arrêté de fumer depuis:</Text>
+            <View style={styles.timerDisplay}>
+              <Text style={styles.timerText}>{timeDisplay.main}</Text>
+              <TouchableOpacity style={styles.secondsButton}>
+                <Text style={styles.secondsText}>{timeDisplay.seconds}</Text>
+              </TouchableOpacity>
+            </View>
+            {/* Indicateur de synchronisation */}
+            {isSyncing && (
+              <View style={styles.syncIndicator}>
+                <Text style={styles.syncText}>🔄 Synchronisation...</Text>
+              </View>
+            )}
+          </View>
 
-          {/* Boutons d'action refactorisés */}
-          <ActionButtons 
-            session={session}
-            onStart={handleStart}
-            onStop={handleStop}
-            onRestart={handleRestart}
-          />
+          {/* Boutons d'action */}
+          <View style={styles.buttonsContainer}>
+            {/* Bouton Engager/Démarrer */}
+            <TouchableOpacity
+              style={[styles.actionButton, styles.commitButton]}
+              onPress={async () => {
+                await HapticService.subtle();
+                session.startTimestamp ? handleStop() : handleStart();
+              }}
+            >
+              <Text style={styles.actionButtonIcon}>
+                {session.startTimestamp ? '✓' : '🚀'}
+              </Text>
+              <Text style={styles.actionButtonText}>
+                {session.startTimestamp ? 'Engagé' : 'Démarrer'}
+              </Text>
+            </TouchableOpacity>
 
-          {/* Graine évolutive refactorisée */}
-          <SeedProgress streak={streak} />
+            {/* Bouton Recommencer */}
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.restartButton]}
+              onPress={async () => {
+                await HapticService.subtle();
+                handleRestart();
+              }}
+            >
+              <Text style={styles.actionButtonIcon}>↻</Text>
+              <Text style={styles.actionButtonText}>Recommencer</Text>
+            </TouchableOpacity>
 
-          {/* Statistiques refactorisées */}
-          <StatsDisplay 
-            profile={profile}
-            dailyEntries={dailyEntries}
-            elapsed={elapsed}
-            settings={settings}
-            streak={streak}
-          />
+            {/* Bouton Panique */}
+            <TouchableOpacity
+              style={[styles.actionButton, styles.panicButton]}
+              onPress={async () => {
+                await HapticService.subtle();
+                handlePanicButton();
+              }}
+            >
+              <Text style={styles.actionButtonIcon}>🚨</Text>
+              <Text style={styles.actionButtonText}>Panique</Text>
+            </TouchableOpacity>
+
+            {/* Bouton Coach IA */}
+            <TouchableOpacity
+              style={[styles.actionButton, styles.aiTherapistButton]}
+              onPress={async () => {
+                await HapticService.subtle();
+                handleAITherapistButton();
+              }}
+            >
+              <Text style={styles.actionButtonIcon}>💬</Text>
+              <Text style={styles.actionButtonText}>Coach IA</Text>
+            </TouchableOpacity>
+
+          </View>
+
+
+          {/* Graine évolutive */}
+          <View style={styles.seedContainer}>
+            <Text style={styles.sectionTitle}>🌱 Ton arbre de progression</Text>
+            <View style={styles.seedImage}>
+              <Text style={styles.seedEmoji}>
+                {seedState === 'tree' ? '🌳' : 
+                 seedState === 'small_tree' ? '🌲' : 
+                 seedState === 'sprout' ? '🌱' : '🌰'}
+              </Text>
+            </View>
+            <Text style={styles.seedDescription}>
+              Série de {streak.currentStreak} jour{streak.currentStreak > 1 ? 's' : ''}
+            </Text>
+            {/* Barre de progression de la graine */}
+            <View style={styles.seedProgressContainer}>
+              <View style={styles.seedProgressBar}>
+                <View style={[styles.seedProgressFill, { width: `${seedProgress * 100}%` }]} />
+              </View>
+              <Text style={styles.seedProgressText}>
+                {Math.round(seedProgress * 100)}% vers l'arbre complet
+              </Text>
+            </View>
+            
+            {/* Texte explicatif */}
+            <View style={styles.seedExplanationContainer}>
+              <Text style={styles.seedExplanationText}>
+                💡 Pour faire évoluer ta plante, viens chaque jour entrer tes saisies quotidiennes. Un jour manqué fera redémarrer ta progression !
+              </Text>
+            </View>
+          </View>
+
+          {/* Statistiques */}
+          <View style={styles.statsContainer}>
+            <View style={styles.statCard}>
+              <Text style={styles.statIcon}>🚬</Text>
+              <Text style={[styles.statNumber, { color: '#FF6B6B' }]}>
+                {cigarettesAvoided}
+              </Text>
+              <Text style={styles.statLabel}>Cigarettes évitées</Text>
+              <Text style={styles.statSubLabel}>
+                Sur {Object.keys(dailyEntries).length} jour{Object.keys(dailyEntries).length > 1 ? 's' : ''}
+              </Text>
+            </View>
+            
+            <View style={styles.statCard}>
+              <Text style={styles.statIcon}>💰</Text>
+              <Text style={[styles.statNumber, { color: '#51CF66' }]}>
+                {moneySaved.toFixed(1)}
+              </Text>
+              <Text style={styles.statLabel}>€ économisés</Text>
+              <Text style={styles.statSubLabel}>
+                @ {settings.pricePerCig}€/cig
+              </Text>
+            </View>
+            
+            <View style={styles.statCard}>
+              <Text style={styles.statIcon}>🌱</Text>
+              <Text style={[styles.statNumber, { color: '#7C3AED' }]}>
+                {streak.currentStreak}
+              </Text>
+              <Text style={styles.statLabel}>Jours de croissance</Text>
+              <Text style={styles.statSubLabel}>
+                Série en cours
+              </Text>
+            </View>
+          </View>
 
           {/* Barre de progression */}
           <View style={styles.progressContainer}>
@@ -401,7 +564,7 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
             <Text style={styles.sectionTitle}>🏥 Dernier bénéfice santé</Text>
             
             {(() => {
-              const currentBenefits = healthBenefits;
+              const currentBenefits = getCurrentHealthBenefits();
               
               // Trouver le dernier objectif accompli
               const accomplishedGoals = currentBenefits.filter(benefit => benefit.unlocked);
@@ -485,7 +648,7 @@ export default function MainTab({ shouldOpenDailyEntry = false, onDailyEntryClos
       <DailyEntryModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        onSave={handleSaveEntryWrapper}
+        onSave={handleSaveEntry}
         date={selectedDate}
         goalCigs={profile.objectiveType === 'complete' ? 0 : getProgressiveGoal(profile, Object.keys(dailyEntries).length)}
         initialEntry={selectedDate ? dailyEntries[selectedDate] : undefined}
@@ -528,6 +691,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
+  gradientContainer: {
+    flex: 1,
+  },
   scrollView: {
     flex: 1,
     zIndex: 1,
@@ -536,6 +702,98 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 40,
     paddingBottom: 100,
+  },
+  sevenDaysContainer: {
+    marginBottom: 40,
+  },
+  daysLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+    paddingHorizontal: 10,
+  },
+  dayLabelContainer: {
+    alignItems: 'center',
+  },
+  dayLabel: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+    opacity: 0.8,
+  },
+  dayDate: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '400',
+    opacity: 0.6,
+    marginTop: 2,
+  },
+  daysIndicators: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: 5,
+  },
+  dayContainer: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  dayIndicator: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(139, 69, 255, 0.3)',
+    borderWidth: 2,
+    borderColor: 'rgba(139, 69, 255, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  dayIndicatorInner: {
+    width: 20,
+    height: 3,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 2,
+  },
+  dayIndicatorIcon: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  dayProgressContainer: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  dayProgressBar: {
+    width: 30,
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  dayProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  dayProgressText: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(139, 69, 255, 0.3)',
+    borderWidth: 2,
+    borderColor: 'rgba(139, 69, 255, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   orbContainer: {
     alignItems: 'center',
@@ -568,6 +826,144 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 25,
     elevation: 25,
+  },
+  timerContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  timerLabel: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginBottom: 15,
+    textAlign: 'center',
+    opacity: 0.9,
+  },
+  timerDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timerText: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
+    marginRight: 15,
+  },
+  secondsButton: {
+    backgroundColor: 'rgba(139, 69, 255, 0.8)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 69, 255, 0.5)',
+  },
+  secondsText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  buttonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 40,
+    paddingHorizontal: 15,
+  },
+  actionButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 75,
+    height: 75,
+    borderRadius: 37.5,
+    borderWidth: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    marginHorizontal: 4, // Espacement horizontal entre les boutons
+  },
+  commitButton: {
+    backgroundColor: 'rgba(76, 175, 80, 0.3)',
+    borderColor: 'rgba(76, 175, 80, 0.7)',
+    shadowColor: '#4CAF50',
+  },
+  panicButton: {
+    backgroundColor: 'rgba(239, 68, 68, 0.3)',
+    borderColor: 'rgba(239, 68, 68, 0.7)',
+    shadowColor: '#EF4444',
+  },
+  aiTherapistButton: {
+    backgroundColor: 'rgba(59, 130, 246, 0.3)',
+    borderColor: 'rgba(59, 130, 246, 0.7)',
+    shadowColor: '#8B5CF6',
+  },
+  restartButton: {
+    backgroundColor: 'rgba(255, 152, 0, 0.3)',
+    borderColor: 'rgba(255, 152, 0, 0.7)',
+    shadowColor: '#FF9800',
+  },
+  moreButton: {
+    backgroundColor: 'rgba(139, 69, 255, 0.3)',
+    borderColor: 'rgba(139, 69, 255, 0.7)',
+    shadowColor: '#8B45FF',
+  },
+  actionButtonIcon: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    marginBottom: 2,
+  },
+  actionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 10,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    marginBottom: 40,
+  },
+  statCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 15,
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  statIcon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  statLabel: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    textAlign: 'center',
+    opacity: 0.8,
+    marginBottom: 2,
+  },
+  statSubLabel: {
+    color: '#94A3B8',
+    fontSize: 9,
+    textAlign: 'center',
+    opacity: 0.6,
   },
   sectionTitle: {
     fontSize: 18,
@@ -616,6 +1012,58 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  healthGoalTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  healthGoalPercentage: {
+    color: '#8B45FF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  healthGoalDescription: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginBottom: 10,
+    lineHeight: 16,
+  },
+  healthProgressBar: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  healthProgressFill: {
+    height: '100%',
+    backgroundColor: '#8B45FF',
+    borderRadius: 3,
+  },
+  healthGoalTimeRemaining: {
+    color: '#64748B',
+    fontSize: 11,
+    fontStyle: 'italic',
+    textAlign: 'right',
+  },
+  healthGoalText: {
+    color: '#10B981',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  healthGoalSubtext: {
+    color: '#94A3B8',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 5,
+    fontStyle: 'italic',
+  },
+  healthGoalCardAccomplished: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
   healthGoalTitleAccomplished: {
     color: '#10B981',
     fontSize: 14,
@@ -651,39 +1099,70 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '600',
   },
-  healthGoalCardAccomplished: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+  seedContainer: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  seedImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+    borderWidth: 2,
     borderColor: 'rgba(16, 185, 129, 0.3)',
   },
-  healthGoalText: {
-    color: '#10B981',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
+  seedEmoji: {
+    fontSize: 40,
   },
-  healthGoalSubtext: {
+  seedDescription: {
     color: '#94A3B8',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 5,
-    fontStyle: 'italic',
+    fontSize: 14,
   },
-  healthProgressBar: {
+  seedProgressContainer: {
+    width: '100%',
+    marginTop: 15,
+  },
+  seedProgressBar: {
     height: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 3,
     overflow: 'hidden',
     marginBottom: 8,
   },
-  healthProgressFill: {
+  seedProgressFill: {
     height: '100%',
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#10B981',
     borderRadius: 3,
   },
-  healthGoalTimeRemaining: {
-    color: '#64748B',
-    fontSize: 11,
+  seedProgressText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  seedExplanationContainer: {
+    marginTop: 15,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 8,
+    paddingVertical: 12,
+  },
+  seedExplanationText: {
+    color: '#E2E8F0',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
     fontStyle: 'italic',
-    textAlign: 'right',
+  },
+  syncIndicator: {
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  syncText: {
+    color: '#8B45FF',
+    fontSize: 12,
+    fontStyle: 'italic',
   },
 });

@@ -126,7 +126,7 @@ export default function DailyEntryModal({
     >
       <View style={styles.overlay}>
         <LinearGradient
-          colors={['#071033', '#1a1a2e', '#16213e']}
+          colors={['#000000', '#000000']}
           style={styles.modalContainer}
         >
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -304,6 +304,8 @@ const styles = StyleSheet.create({
     maxHeight: '80%',
     borderRadius: 20,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   content: {
     padding: 20,

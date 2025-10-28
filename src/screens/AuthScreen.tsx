@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,7 +26,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resetPassword } = useAuth();
 
   const handleAuth = async () => {
     if (!email || !password) {
@@ -70,6 +71,30 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!email) {
+      Alert.alert('Erreur', 'Veuillez saisir votre adresse email');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await resetPassword(email);
+      if (result.error) {
+        Alert.alert('Erreur', result.error.message);
+      } else {
+        Alert.alert(
+          'Email envoyé',
+          'Un email de réinitialisation a été envoyé à votre adresse email.'
+        );
+      }
+    } catch (error) {
+      Alert.alert('Erreur', 'Une erreur inattendue s\'est produite');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <StarryBackground>
       <KeyboardAvoidingView
@@ -90,7 +115,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           </View>
           
           <View style={styles.content}>
-            <Text style={styles.title}>🌱 MyQuitSpace</Text>
+            <Image 
+              source={require('../../assets/cigarette-logo.png')} 
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <Text style={styles.title}>MyQuitZone</Text>
             <Text style={styles.subtitle}>
               {isSignUp ? 'Créez votre compte' : 'Connectez-vous'}
             </Text>
@@ -152,6 +182,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
                   }
                 </Text>
               </TouchableOpacity>
+
+              {!isSignUp && (
+                <TouchableOpacity
+                  style={styles.forgotPasswordButton}
+                  onPress={handleForgotPassword}
+                  disabled={loading}
+                >
+                  <Text style={styles.forgotPasswordText}>
+                    Mot de passe oublié ?
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </ScrollView>
@@ -224,6 +266,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 2,
   },
+  logo: {
+    width: 80,
+    height: 80,
+    marginBottom: 20,
+  },
   title: {
     fontSize: 36,
     fontWeight: 'bold',
@@ -281,6 +328,15 @@ const styles = StyleSheet.create({
   },
   switchButtonText: {
     color: 'white',
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
+  forgotPasswordButton: {
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  forgotPasswordText: {
+    color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 14,
     textDecorationLine: 'underline',
   },

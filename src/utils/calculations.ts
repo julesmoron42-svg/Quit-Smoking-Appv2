@@ -236,6 +236,50 @@ export const getProgressiveGoal = (
   return Math.floor(theoreticalCigs);
 };
 
+// Calcul de l'objectif progressif basé sur la date réelle depuis le début
+export const getProgressiveGoalByDate = (
+  profile: UserProfile,
+  targetDate: string,
+  startDate: string
+): number => {
+  const startCigs = profile.cigsPerDay;
+  
+  // Si arrêt immédiat (complete) et date d'arrêt définie
+  if (profile.objectiveType === 'complete' && profile.targetDate) {
+    const targetDateObj = new Date(profile.targetDate);
+    const currentDateObj = new Date(targetDate);
+    
+    // Si on est après la date d'arrêt, consommation = 0
+    if (currentDateObj >= targetDateObj) {
+      return 0;
+    }
+    
+    // Avant la date d'arrêt, consommation normale
+    return startCigs;
+  }
+  
+  // Si arrêt immédiat sans date spécifique, retourner 0
+  if (profile.objectiveType === 'complete') {
+    return 0;
+  }
+  
+  // Si réduction progressive
+  const reductionPerWeek = profile.reductionFrequency || 1;
+  
+  // Calculer le nombre de jours écoulés depuis le début
+  const startDateObj = new Date(startDate);
+  const targetDateObj = new Date(targetDate);
+  const daysElapsed = Math.floor((targetDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24));
+  
+  // Calculer le nombre de semaines écoulées
+  const weeksElapsed = Math.floor(daysElapsed / 7);
+  
+  // Calculer la consommation théorique : diminuer de reductionPerWeek cigarettes par semaine
+  const theoreticalCigs = Math.max(0, startCigs - (weeksElapsed * reductionPerWeek));
+  
+  return Math.floor(theoreticalCigs);
+};
+
 // Calcul du pourcentage de progression de la graine
 export const getSeedProgress = (streak: number, totalDays: number = 60): number => {
   const phases = Math.ceil(totalDays / 6);
@@ -487,9 +531,9 @@ export const generateCigarettesChartData = (
       // Utiliser l'objectif réel stocké dans la base de données
       theoreticalCigs = entry.goalCigs;
     } else {
-      // Calculer l'objectif théorique basé sur le nombre d'entrées jusqu'à ce jour
-      const entriesUpToThisDay = Object.keys(dailyEntries).filter(entryDate => entryDate <= dateString).length;
-      theoreticalCigs = getProgressiveGoal(profile, entriesUpToThisDay);
+      // Calculer l'objectif théorique basé sur la date réelle depuis le début du programme
+      const startDateString = sortedDates.length > 0 ? sortedDates[0] : dateString;
+      theoreticalCigs = getProgressiveGoalByDate(profile, dateString, startDateString);
     }
     theoreticalData.push(theoreticalCigs);
     
@@ -592,9 +636,9 @@ export const generateSavingsChartData = (
       // Utiliser l'objectif réel stocké dans la base de données
       theoreticalCigs = entry.goalCigs;
     } else {
-      // Calculer l'objectif théorique basé sur le nombre d'entrées jusqu'à ce jour
-      const entriesUpToThisDay = Object.keys(dailyEntries).filter(entryDate => entryDate <= dateString).length;
-      theoreticalCigs = getProgressiveGoal(profile, entriesUpToThisDay);
+      // Calculer l'objectif théorique basé sur la date réelle depuis le début du programme
+      const startDateString = sortedDates.length > 0 ? sortedDates[0] : dateString;
+      theoreticalCigs = getProgressiveGoalByDate(profile, dateString, startDateString);
     }
     const dailyTheoreticalSavings = Math.max(0, profile.cigsPerDay - theoreticalCigs) * pricePerCig;
     theoreticalCumulative += dailyTheoreticalSavings;

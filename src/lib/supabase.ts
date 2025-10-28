@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
 const supabaseUrl = 'https://hdaqsjulitpzckaphujg.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkYXFzanVsaXRwemNrYXBodWpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwOTkxOTgsImV4cCI6MjA3NTY3NTE5OH0.GlKNemwZoiISXiayFDg0KFaRt6NHD1doE3UdtYyNw6M';
 
-// Configuration adaptée selon la plateforme
+// Configuration adaptée selon la plateforme et l'environnement
 const authConfig = Platform.OS === 'web' 
   ? {
       autoRefreshToken: true,
@@ -18,6 +18,10 @@ const authConfig = Platform.OS === 'web'
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,
+      // Configuration spécifique pour la production
+      flowType: 'pkce' as const,
+      // Forcer la persistance même en production
+      debug: __DEV__,
     };
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {

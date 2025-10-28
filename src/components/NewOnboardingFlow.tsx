@@ -518,29 +518,31 @@ export default function NewOnboardingFlow({ visible, onComplete }: NewOnboarding
             {currentStep <= 3 ? (
               // Étapes d'introduction
               <View style={styles.introContainer}>
-                <View style={styles.logoContainer}>
-                  <Image 
-                    source={require('../../assets/cigarette-logo.png')} 
-                    style={styles.logo}
-                    resizeMode="contain"
-                  />
+                <View style={styles.introContent}>
+                  <View style={styles.logoContainer}>
+                    <Image 
+                      source={require('../../assets/cigarette-logo.png')} 
+                      style={styles.logo}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <Text style={styles.introTitle}>{introSteps[currentStep].title}</Text>
+                  
+                  {/* Effet machine à écrire pour les messages de motivation des étapes 0-4 */}
+                  {currentStep <= 4 ? (
+                    <TypewriterText
+                      text={introSteps[currentStep].message}
+                      speed={30}
+                      hapticEnabled={false}
+                      style={styles.introMessage}
+                      onComplete={() => {
+                        // Pas de vibration à la fin
+                      }}
+                    />
+                  ) : (
+                    <Text style={styles.introMessage}>{introSteps[currentStep].message}</Text>
+                  )}
                 </View>
-                <Text style={styles.introTitle}>{introSteps[currentStep].title}</Text>
-                
-                {/* Effet machine à écrire pour les messages de motivation des étapes 0-4 */}
-                {currentStep <= 4 ? (
-                  <TypewriterText
-                    text={introSteps[currentStep].message}
-                    speed={30}
-                    hapticEnabled={false}
-                    style={styles.introMessage}
-                    onComplete={() => {
-                      // Pas de vibration à la fin
-                    }}
-                  />
-                ) : (
-                  <Text style={styles.introMessage}>{introSteps[currentStep].message}</Text>
-                )}
                 
                 <TouchableOpacity 
                   style={styles.ctaButton} 
@@ -674,13 +676,20 @@ const styles = StyleSheet.create({
   // Styles pour les étapes d'introduction
   introContainer: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 60,
+    paddingTop: 80,
+    paddingBottom: 40,
+  },
+  introContent: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    width: '100%',
   },
   logoContainer: {
-    marginBottom: 40,
+    marginBottom: 30,
   },
   logo: {
     width: 80,
@@ -703,7 +712,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 26,
     marginTop: 20,
-    marginBottom: 40,
+    marginBottom: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 16,
     padding: 20,
@@ -727,6 +736,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+    position: 'absolute',
+    bottom: height * 0.25, // Position à 3/4 de la hauteur (25% du bas)
+    alignSelf: 'center',
   },
   ctaButtonText: {
     color: '#FFFFFF',

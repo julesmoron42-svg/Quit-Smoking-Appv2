@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { clearLocalDataOnUserChange, syncAllDataWithUser, loadAllDataFromSupabase, sessionStorage } from '../lib/storage';
 import { notificationService } from '../lib/notificationService';
@@ -31,41 +33,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    // console.log('🔍 AuthContext: Initialisation...');
-    
-    // Récupérer la session actuelle
-    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-      // console.log('🔍 AuthContext: Session récupérée:', { 
-      //   hasSession: !!session, 
-      //   hasUser: !!session?.user,
-      //   userEmail: session?.user?.email,
-      //   error: error?.message 
-      // });
-      
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-      
-      // Si un utilisateur est connecté, charger les données depuis Supabase
-      if (session?.user) {
-        console.log('📥 Utilisateur connecté, chargement des données depuis Supabase...');
-        // Utiliser le chargement forcé pour s'assurer que les données sont bien chargées
-        setTimeout(async () => {
-          try {
-            const { forceLoadAllDataFromSupabase, dailyEntriesStorage } = await import('../lib/storage');
-            await forceLoadAllDataFromSupabase();
-            
-            // Initialiser la synchronisation en arrière-plan des entrées en attente
-            await dailyEntriesStorage.syncPendingEntriesInBackground();
-          } catch (error) {
-            console.error('Erreur chargement:', error);
-          }
-        }, 1000); // Délai de 1 seconde pour éviter les conflits
+    // Fonction pour récupérer la session avec retry
+    const getSessionWithRetry = async (retryCount = 0) => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+        
+        // Si pas de session et qu'on est en production, essayer de récupérer depuis AsyncStorage
+        if (!session && !__DEV__ && retryCount === 0) {
+          setTimeout(() => getSessionWithRetry(1), 1000);
+          return;
+        }
+        
+        // Si un utilisateur est connecté, charger les données depuis Supabase
+        if (session?.user) {
+          // Utiliser le chargement forcé pour s'assurer que les données sont bien chargées
+          setTimeout(async () => {
+            try {
+              const { forceLoadAllDataFromSupabase, dailyEntriesStorage } = await import('../lib/storage');
+              await forceLoadAllDataFromSupabase();
+              
+              // Initialiser la synchronisation en arrière-plan des entrées en attente
+              await dailyEntriesStorage.syncPendingEntriesInBackground();
+            } catch (error) {
+              console.error('Erreur chargement:', error);
+            }
+          }, 1000); // Délai de 1 seconde pour éviter les conflits
+        }
+      } catch (error) {
+        if (retryCount === 0) {
+          // Retry une fois après 2 secondes
+          setTimeout(() => getSessionWithRetry(1), 2000);
+        } else {
+          setLoading(false);
+        }
       }
-    }).catch(error => {
-      console.error('❌ AuthContext: Erreur lors de la récupération de session:', error);
-      setLoading(false);
-    });
+    };
+    
+    // Lancer la récupération de session
+    getSessionWithRetry();
 
     // Écouter les changements d'authentification
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -79,7 +88,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (event === 'SIGNED_IN' && session?.user) {
         // Vérifier si c'est un changement d'utilisateur
         if (previousUser && previousUser.email !== session.user.email) {
-          console.log('👤 Changement d\'utilisateur détecté, réinitialisation complète des données');
           // Le chrono sera automatiquement réinitialisé par clearLocalDataOnUserChange
           // qui est appelé lors de la déconnexion précédente
         }
@@ -88,7 +96,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // (seulement si l'utilisateur n'a pas encore d'autorisation)
         const hasPermission = await notificationService.checkPermission();
         if (!hasPermission) {
-          console.log('🔔 Première connexion détectée, demande d\'autorisation pour les notifications...');
           // Délai de 2 secondes pour laisser le temps à l'interface de se charger
           setTimeout(async () => {
             await notificationService.requestPermission();
@@ -96,7 +103,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
         
         // Utilisateur connecté - charger les données depuis Supabase et initialiser la sync en arrière-plan
-        console.log('📥 Connexion détectée, chargement des données depuis Supabase...');
         setTimeout(async () => {
           try {
             const { forceLoadAllDataFromSupabase, dailyEntriesStorage } = await import('../lib/storage');
@@ -110,7 +116,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }, 1000);
       } else if (event === 'SIGNED_OUT' || (previousUser && !session?.user)) {
         // Utilisateur déconnecté - nettoyer les données locales (chrono préservé)
-        console.log('🚪 Déconnexion détectée, nettoyage des données locales');
         await clearLocalDataOnUserChange();
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
         // Token rafraîchi - charger les données depuis Supabase
@@ -128,6 +133,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: 'myquitzone://auth/callback'
+        }
       });
 
       if (error) {
@@ -160,6 +168,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
+      
+      // Nettoyer explicitement le stockage local
+      try {
+        await AsyncStorage.removeItem('sb-hdaqsjulitpzckaphujg-auth-token');
+        await AsyncStorage.removeItem('@MyQuitZone:session');
+      } catch (storageError) {
+        // Erreur silencieuse lors du nettoyage
+      }
+      
       return { error: error ? { message: error.message, status: error.status } : null };
     } catch (error) {
       return { error: { message: 'Une erreur inattendue s\'est produite' } };
@@ -168,7 +185,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const resetPassword = async (email: string) => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'myquitzone://auth/reset-password'
+      });
       return { error: error ? { message: error.message, status: error.status } : null };
     } catch (error) {
       return { error: { message: 'Une erreur inattendue s\'est produite' } };
